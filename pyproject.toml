@@ -10,6 +10,7 @@ dependencies = [
     "requests >= 2.32.3, < 3.0.0",
     "scipy >= 1.15.3, < 2.0.0",
     "numpy >= 2.2.0, < 3.0.0",
+    "platformdirs >= 4.3.8, < 5.0.0",
 ]
 requires-python = ">=3.13"
 authors = [
@@ -27,4 +28,6 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 [tool.setuptools.packages.find]
-where = ["mftools/"]
+where = ["."]
+include = ["mftools*"]
+exclude = ["mftools.tests*"]
