@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools >= 77.0.3, < 78.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mftools"
+version = "0.1.0"
+dependencies = [
+    "polars >= 1.29.0, < 2.0.0",
+    "requests >= 2.32.3, < 3.0.0",
+    "scipy >= 1.15.3, < 2.0.0",
+    "numpy >= 2.2.0, < 3.0.0",
+]
+requires-python = ">=3.13"
+authors = [
+    { name = "Yashovardhan Dhanania", email = "yashovardhandhanania@gmail.com" },
+]
+maintainers = [
+    { name = "Yashovardhan Dhanania", email = "yashovardhandhanania@gmail.com" },
+]
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["finance", "mutual funds", "investment"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+]
+[tool.setuptools.packages.find]
+where = ["mftools/"]
