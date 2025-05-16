@@ -1,8 +1,10 @@
 [build-system]
 requires = ["hatchling >= 1.27.0, < 2.0.0"]
 build-backend = "hatchling.build"
+
 [project]
 name = "mftools"
+description = "A simple python library for all your mutual fund needs."
 version = "0.1.0"
 dependencies = [
     "polars >= 1.29.0, < 2.0.0",
@@ -10,6 +12,8 @@ dependencies = [
     "scipy >= 1.15.3, < 2.0.0",
     "numpy >= 2.2.0, < 3.0.0",
     "platformdirs >= 4.3.8, < 5.0.0",
+    "pandas >= 2.2.3, < 3.0.0",
+    "pyarrow >= 20.0.0, < 21.0.0",
 ]
 requires-python = ">=3.13"
 authors = [
@@ -26,9 +30,24 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.13",
 ]
+
+[project.urls]
+Homepage = "http://github.com/yashovardhan99/mftools"
+# Documentation = "https://readthedocs.org"
+Repository = "https://github.com/yashovardhan99/mftools.git"
+Issues = "http://github.com/yashovardhan99/mftools/issues"
+Changelog = "http://github.com/yashovardhan99/mftools/blob/master/CHANGELOG.md"
+funding = "https://github.com/yashovardhan99/mftools"
+releasenotes = "https://github.com/yashovardhan99/mftools/releases"
+
 [dependency-groups]
 testing = ["pytest >= 8.3.5, < 9.0.0"]
 linting = ["ruff >= 0.11.9, < 0.12.0"]
+
+[tool.ruff.lint]
+extend-select = [
+    "D", # Docstrings
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
