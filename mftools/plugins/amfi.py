@@ -1,10 +1,11 @@
 """A built-in plugin for MFTools that provides AMFI as a source."""
 
+from datetime import timedelta
 import logging
 from pathlib import Path
 import mftools
 from mftools.models.plugins import Plugin, PluginInfo
-from mftools.models.sources import Source
+from mftools.models.sources import Source, SourceInfo
 import requests
 import tempfile
 import polars as pl
@@ -105,7 +106,6 @@ class AMFISource(Source):
                     pl.col("Scheme Code").alias("symbol"),
                     pl.col("Scheme Name").alias("name"),
                     pl.coalesce(pl.col("^ISIN .*$")).alias("isin"),
-                    pl.lit(self.get_source_key()).alias("source_key"),
                 ).collect()
             else:
                 return list()
@@ -114,6 +114,17 @@ class AMFISource(Source):
     def get_source_key(cls):
         """Return the source key."""
         return "amfi"
+
+    @classmethod
+    def get_source_info(cls):
+        """Return source information."""
+        return SourceInfo(
+            name="Mutual Fund India",
+            description="Data source for all Indian mutual funds, sourced from AMFI.",
+            key=AMFISource.get_source_key(),
+            ticker_refresh_interval=timedelta(days=7),
+            data_refresh_interval=timedelta(days=1),
+        )
 
 
 def register_plugin() -> AMFIPlugin:

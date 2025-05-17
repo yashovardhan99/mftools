@@ -8,4 +8,5 @@ class ReturnFormat(Enum):
 
     LIST = "list"
     PL_DATAFRAME = "pl_dataframe"
+    PL_LAZYFRAME = "pl_lazyframe"
     PD_DATAFRAME = "pd_dataframe"

@@ -15,7 +15,7 @@ dependencies = [
     "pandas >= 2.2.3, < 3.0.0",
     "pyarrow >= 20.0.0, < 21.0.0",
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 authors = [
     { name = "Yashovardhan Dhanania", email = "yashovardhandhanania@gmail.com" },
 ]
@@ -28,6 +28,9 @@ license-files = ["LICENSE"]
 keywords = ["finance", "mutual funds", "investment"]
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
 ]
 
