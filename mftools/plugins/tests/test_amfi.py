@@ -16,6 +16,7 @@ import pytest
 import requests
 
 from mftools.plugins import amfi
+from mftools.models.plugins import PluginInfo, Plugin
 import datetime
 
 
@@ -34,11 +35,6 @@ class MockTextResponse:
         """Mock method to simulate streaming content."""
         yield b"Test Header"
         yield b"Test Data"
-
-    @staticmethod
-    def close():
-        """Mock method to simulate closing the response."""
-        pass
 
 
 @pytest.fixture
@@ -99,3 +95,18 @@ def test_download_latest_data_success(mock_requests_success: None, tmp_path: Pat
         content = file.read()
         assert b"Test Header" in content
         assert b"Test Data" in content
+
+
+def test_register_plugin():
+    """Test the register_plugin function."""
+    plugin = amfi.register_plugin()
+    assert plugin is not None
+    assert isinstance(plugin, Plugin)
+
+
+def test_get_plugin_info():
+    """Test the get_plugin_info function."""
+    plugin = amfi.register_plugin()
+    plugin_info = plugin.get_info()
+    assert plugin_info is not None
+    assert isinstance(plugin_info, PluginInfo)

@@ -44,8 +44,8 @@ funding = "https://github.com/yashovardhan99/mftools"
 releasenotes = "https://github.com/yashovardhan99/mftools/releases"
 
 [dependency-groups]
-testing = ["pytest >= 8.3.5, < 9.0.0"]
-linting = ["ruff >= 0.11.9, < 0.12.0"]
+testing = ["pytest >= 8.3.5, < 9.0.0", "coverage[toml] >= 7.8.0, < 8.0.0"]
+linting = ["ruff >= 0.11.9, < 0.12.0", "mypy >= 1.15.0 < 2.0.0"]
 
 [tool.ruff.lint]
 extend-select = [
@@ -54,3 +54,22 @@ extend-select = [
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.coverage.report]
+# Regexes for lines to exclude from consideration
+exclude_also = [
+    # Don't complain about missing debug-only code:
+    "def __repr__",
+    "if self\\.debug",
+
+    # Don't complain if tests don't hit defensive assertion code:
+    "raise AssertionError",
+    "raise NotImplementedError",
+
+    # Don't complain if non-runnable code isn't run:
+    "if 0:",
+    "if __name__ == .__main__.:",
+
+    # Don't complain about abstract methods, they aren't run:
+    "@(abc\\.)?abstractmethod",
+]

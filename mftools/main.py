@@ -1,19 +1,19 @@
 """Mutual Fund utilities for Python."""
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import date, datetime
 import logging
 import importlib
 import pkgutil
-import warnings
 
 from mftools.models.helpers import ReturnFormat
 from mftools.models.sources import Source, SourceInfo, Ticker
-import mftools.plugins
+from mftools.plugins import __path__ as __plugins_path
 from mftools.models.plugins import Plugin
-import mftools.tickers as _tickers
+from mftools.tickers import load_tickers, save_tickers
+from mftools.utils import format_output, apply_filters, handle_input
 
-from typing import Dict, Iterable, List, Optional, Union
+from typing import Dict, Iterable, List, Literal, Optional, Tuple, Union, overload
 import pandas as pd
 import polars as pl
 
@@ -44,7 +44,7 @@ def _import_local_plugins() -> Iterable[Plugin]:
         (
             _import_plugin(name)
             for _, name, ispkg in pkgutil.iter_modules(
-                mftools.plugins.__path__, "mftools.plugins."
+                __plugins_path, "mftools.plugins."
             )
             if not ispkg
         ),
@@ -88,64 +88,73 @@ class MFTools:
     def get_sources(
         self, source_keys: Optional[List[str]] = None
     ) -> Iterable[SourceInfo]:
-        """Get the list of sources from all plugins."""
+        """Get the list of sources from all plugins.
+
+        Args:
+            source_keys (Optional[List[str]]): The source keys to filter by.
+                Defaults to None.
+                The source key is the key used to identify the source of the tickers.
+                If source_keys is specified, only the sources from the specified keys
+                are returned.
+                For example, to filter by source key, you can use:
+                source_key = ["amfi"]
+                This will return only the sources from the AMFI source.
+                If source_key is None, all sources from all plugins are returned.
+
+        Returns:
+            Iterable[SourceInfo]: An iterable of SourceInfo objects.
+        """
         sources = self._get_sources(source_keys)
         return map(lambda source: source.get_source_info(), sources)
+
+    @overload
+    def get_tickers(
+        self,
+        filters: Optional[Dict[str, List[str]]] = None,
+        source_keys: Optional[List[str]] = None,
+        format: Literal[ReturnFormat.DICT] = ...,
+    ) -> Dict[str, List]: ...
+
+    @overload
+    def get_tickers(
+        self,
+        filters: Optional[Dict[str, List[str]]] = None,
+        source_keys: Optional[List[str]] = None,
+        format: Literal[ReturnFormat.PL_DATAFRAME] = ...,
+    ) -> pl.DataFrame: ...
 
     def get_tickers(
         self,
         filters: Optional[Dict[str, List[str]]] = None,
         source_keys: Optional[List[str]] = None,
-        format: Union[ReturnFormat, str] = ReturnFormat.LIST,
-    ) -> Union[Iterable[Ticker], pl.DataFrame, pl.LazyFrame, pd.DataFrame]:
+        format: Union[ReturnFormat, str] = ReturnFormat.DICT,
+    ) -> Union[Dict[str, List], pl.DataFrame, pl.LazyFrame, pd.DataFrame]:
         """Get the list of tickers from all plugins.
 
         Args:
-            format (ReturnFormat): The format of the returned tickers.
-                Defaults to ReturnFormat.LIST.
-                The available formats are:
-                - ReturnFormat.LIST ("list"): Returns a list of Ticker objects.
-                - ReturnFormat.PL_DATAFRAME ("pl_dataframe"): Returns a Polars DataFrame.
-                - ReturnFormat.PL_LAZYFRAME ("pl_lazyframe"): Returns a Polars LazyFrame.
-                - ReturnFormat.PD_DATAFRAME ("pd_dataframe"): Returns a Pandas DataFrame.
-
             filters (Optional[Dict[str, List[str]]]): Filters to apply to the tickers.
                 Defaults to None.
-                The filters are applied to the tickers returned by the plugins.
-                All filters and combined using OR. The keys of the dictionary are
-                the column names and the values are lists of values to filter by.
-                For example, to filter by symbol or name, you can use:
-                filters = {
-                    "symbol": ["0500209", "500210"],
-                    "name": ["UTI Nifty Next 50 Index Fund - Direct"]
-                }
-                This will return only the tickers that match the specified symbol or name.
-                If filters is None, all tickers are returned.
+                See [mftools.utils.filter_tickers] for available filters.
 
             source_keys (Optional[List[str]]): The source keys to filter by.
-                Defaults to None.
-                The source key is the key used to identify the source of the tickers.
-                If source_keys is specified, only the tickers from the specified sources
-                are returned.
-                For example, to filter by source key, you can use:
-                source_key = ["amfi"]
-                This will return only the tickers from the AMFI source.
+                Defaults to None. If source_keys is specified, only the tickers
+                from the specified sources are returned.
                 If source_key is None, all tickers from all sources are returned.
+
+            format (ReturnFormat): The format of the returned tickers.
+                Defaults to ReturnFormat.DICT. See [mftools.models.helpers.ReturnFormat] for available formats.
 
         Returns:
             Union[Iterable[Ticker], pl.DataFrame, pd.DataFrame]: The list of tickers in the specified format.
         """
-        logger.debug("Getting locally saved tickers")
-        df_tickers = pl.LazyFrame(schema=Ticker.polars_schema).with_columns(
+        df_tickers = Ticker.polars_schema.to_frame(eager=False).with_columns(
             pl.lit(None).cast(pl.String()).alias("source_key"),
         )
         pre_loaded_sources = defaultdict(lambda: datetime.min)
         try:
-            df_tickers_pre = _tickers.load_tickers()
+            logger.debug("Getting locally saved tickers")
+            df_tickers_pre = load_tickers()
             logger.debug("Loaded locally saved tickers")
-            df_tickers_pre = _tickers.filter_tickers(
-                df_tickers_pre, source_keys, filters
-            )
             df_sources = (
                 df_tickers_pre.group_by("source_key")
                 .agg(pl.min("last_updated").alias("last_updated"))
@@ -164,42 +173,20 @@ class MFTools:
         logger.debug("Getting tickers from all plugins")
         all_tickers = [df_tickers]
         for source in self._get_sources(source_keys):
+            # This will run for all sources matching the source_keys (if applicable)
             key = source.get_source_key()
-            if source_keys and key not in source_keys:
-                logger.debug(
-                    f"Skipping source {source.get_source_info()} as it is not in the specified source keys"
-                )
-                continue
             if (
                 key in pre_loaded_sources
                 and (datetime.now() - pre_loaded_sources[key])
                 < source.get_source_info().ticker_refresh_interval
             ):
                 logger.debug(f"Skipping source {key} as it is up to date")
-                continue
-
-            tickers = source.get_tickers()
-            if isinstance(tickers, (pl.DataFrame, pl.LazyFrame)):
-                all_tickers.append(
-                    tickers.with_columns(pl.lit(key).alias("source_key")).lazy()
-                )
-            elif isinstance(tickers, pd.DataFrame):
-                all_tickers.append(
-                    pl.from_pandas(tickers, schema_overrides=Ticker.polars_schema)
-                    .with_columns(pl.lit(key).alias("source_key"))
-                    .lazy()
-                )
-            elif isinstance(tickers, Iterable):
-                all_tickers.append(
-                    pl.from_dicts(
-                        map(Ticker.to_dict, tickers), schema=Ticker.polars_schema
-                    )
-                    .with_columns(pl.lit(key).alias("source_key"))
-                    .lazy()
-                )
             else:
-                warnings.warn(
-                    f'Invalid type {type(tickers)} received for source_key = "{source.get_source_key()}". Please contact the plugin author.'
+                logger.debug(f"Getting tickers from source {key}")
+                all_tickers.append(
+                    handle_input(
+                        source.get_tickers(), Ticker.polars_schema
+                    ).with_columns(pl.lit(key).alias("source_key"))
                 )
 
         logger.debug(f"Loaded {len(all_tickers)} tickers from all plugins")
@@ -213,9 +200,6 @@ class MFTools:
             pl.lit(datetime.now()).alias("last_updated"),
         )
 
-        logger.debug("Applying filters to tickers")
-        df_tickers = _tickers.filter_tickers(df_tickers, source_keys, filters)
-
         logger.debug("Combining tickers with locally saved tickers")
         df_tickers = df_tickers_pre.update(
             df_tickers,
@@ -223,20 +207,41 @@ class MFTools:
             how="full",
         )
 
-        logger.debug("Saving tickers to local file")
-        _tickers.save_tickers(df_tickers)
+        logger.debug("Saving all tickers to local file")
+        save_tickers(df_tickers)
 
-        if isinstance(format, str):
-            format = ReturnFormat(format)
-        if format == ReturnFormat.LIST:
-            return map(
-                Ticker.from_dict, df_tickers.drop("source_key").collect().to_dicts()
-            )
-        elif format == ReturnFormat.PL_DATAFRAME:
-            return df_tickers.collect()
-        elif format == ReturnFormat.PL_LAZYFRAME:
-            return df_tickers
-        elif format == ReturnFormat.PD_DATAFRAME:
-            return df_tickers.collect().to_pandas()
-        else:
-            raise ValueError("Invalid format specified")
+        logger.debug("Applying filters to tickers")
+        df_tickers = apply_filters(df_tickers, source_keys, filters)
+
+        return format_output(df_tickers, format)
+
+    def get_quotes(
+        self,
+        *tickers: Union[str, Tuple[str, str]],
+        start_date: date = date.today(),
+        end_date: date = date.today(),
+        format: Union[ReturnFormat, str] = ReturnFormat.DICT,
+    ) -> Union[Iterable[pl.DataFrame], pl.DataFrame, pl.LazyFrame, pd.DataFrame]:
+        """Get the quotes for the specified tickers.
+
+        Args:
+            tickers (Union[str, Tuple[str, str]]): The tickers to get quotes for.
+                This can be a single symbol, a list of symbols, or a list of tuples
+                containing the symbol and the source key.
+                If source key is not specified, all available sources are checked.
+
+            start_date (date): The start date for the quotes. Defaults to today.
+
+            end_date (date): The end date for the quotes. Defaults to today.
+
+            format (ReturnFormat): The format of the returned tickers.
+                Defaults to ReturnFormat.DICT. See [mftools.models.helpers.ReturnFormat] for available formats.
+
+        Returns:
+            Union[Iterable[pl.DataFrame], pl.DataFrame, pd.DataFrame]: The quotes in the specified format.
+
+        Example:
+            >>> mftools = MFTools()
+            >>> quotes = mftools.get_quotes("500209", "500210", ("500211", "amfi"))
+        """
+        pass
