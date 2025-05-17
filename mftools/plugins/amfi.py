@@ -24,7 +24,7 @@ class AMFIPlugin(Plugin):
         author_email="",
     )
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the AMFI plugin."""
         super().__init__()
         self.sources = [AMFISource()]
@@ -47,7 +47,7 @@ class AMFISource(Source):
     LATEST_URL = "http://amfiindia.com/spages/NAVAll.txt"
     HISTORICAL_URL = "https://portal.amfiindia.com/DownloadNAVHistoryReport_Po.aspx?frmdt={frm_dt}&todt={to_dt}"
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the AMFI source."""
         super().__init__()
         # Initialize any necessary attributes here.

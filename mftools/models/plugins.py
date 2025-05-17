@@ -25,7 +25,7 @@ class PluginInfo:
 class Plugin(abc.ABC):
     """Base class for all plugins."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the plugin."""
         super().__init__()
 

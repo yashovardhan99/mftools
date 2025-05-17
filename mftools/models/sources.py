@@ -73,7 +73,7 @@ class SourceInfo:
 class Source(abc.ABC):
     """Base class for all data sources."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the source."""
         super().__init__()
 

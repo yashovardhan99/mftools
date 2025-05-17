@@ -55,7 +55,7 @@ def _import_local_plugins() -> Iterable[Plugin]:
 class MFTools:
     """This is the base class for MFTools."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the MFTools class."""
         logger.debug("Initializing MFTools")
         local_plugins = _import_local_plugins()
