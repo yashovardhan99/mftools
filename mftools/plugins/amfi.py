@@ -16,21 +16,23 @@ logger = logging.getLogger(__name__)
 class AMFIPlugin(Plugin):
     """AMFI Plugin for MFTools."""
 
+    plugin_info = PluginInfo(
+        name="AMFI",
+        description="AMFI plugin for MFTools",
+        version=mftools.__version__,
+        author="Yashovardhan Dhanania",
+        author_email="",
+    )
+
     def __init__(self):
         """Initialize the AMFI plugin."""
         super().__init__()
-        self.plugin_info = PluginInfo(
-            name="AMFI",
-            description="AMFI plugin for MFTools",
-            version=mftools.__version__,
-            author="Yashovardhan Dhanania",
-            author_email="",
-        )
         self.sources = [AMFISource()]
 
-    def get_info(self):
+    @classmethod
+    def get_info(cls) -> PluginInfo:
         """Return plugin information."""
-        return self.plugin_info
+        return cls.plugin_info
 
     def get_sources(self):
         """Return a list of sources for the plugin."""

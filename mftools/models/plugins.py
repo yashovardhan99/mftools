@@ -31,7 +31,7 @@ class Plugin(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def get_info() -> PluginInfo:
+    def get_info(cls) -> PluginInfo:
         """Return plugin information."""
         raise NotImplementedError("Subclasses must implement this method.")
 

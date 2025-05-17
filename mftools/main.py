@@ -1,19 +1,19 @@
 """Mutual Fund utilities for Python."""
 
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import datetime
 import logging
 import importlib
 import pkgutil
 
 from mftools.models.helpers import ReturnFormat
 from mftools.models.sources import Source, SourceInfo, Ticker
-from mftools.plugins import __path__ as __plugins_path
+import mftools.plugins as _local_plugins
 from mftools.models.plugins import Plugin
 from mftools.tickers import load_tickers, save_tickers
 from mftools.utils import format_output, apply_filters, handle_input
 
-from typing import Dict, Iterable, List, Literal, Optional, Tuple, Union, overload
+from typing import Dict, Iterable, List, Literal, Optional, Union, overload
 import pandas as pd
 import polars as pl
 
@@ -44,7 +44,7 @@ def _import_local_plugins() -> Iterable[Plugin]:
         (
             _import_plugin(name)
             for _, name, ispkg in pkgutil.iter_modules(
-                __plugins_path, "mftools.plugins."
+                _local_plugins.__path__, "mftools.plugins."
             )
             if not ispkg
         ),
@@ -123,12 +123,36 @@ class MFTools:
         format: Literal[ReturnFormat.PL_DATAFRAME] = ...,
     ) -> pl.DataFrame: ...
 
+    @overload
+    def get_tickers(
+        self,
+        filters: Optional[Dict[str, List[str]]] = None,
+        source_keys: Optional[List[str]] = None,
+        format: Literal[ReturnFormat.PL_LAZYFRAME] = ...,
+    ) -> pl.LazyFrame: ...
+
+    @overload
+    def get_tickers(
+        self,
+        filters: Optional[Dict[str, List[str]]] = None,
+        source_keys: Optional[List[str]] = None,
+        format: Literal[ReturnFormat.PD_DATAFRAME] = ...,
+    ) -> pd.DataFrame: ...
+
+    @overload
+    def get_tickers(
+        self,
+        filters: Optional[Dict[str, List[str]]] = None,
+        source_keys: Optional[List[str]] = None,
+        format: Union[Literal[ReturnFormat.JSON], Literal[ReturnFormat.CSV]] = ...,
+    ) -> str: ...
+
     def get_tickers(
         self,
         filters: Optional[Dict[str, List[str]]] = None,
         source_keys: Optional[List[str]] = None,
         format: Union[ReturnFormat, str] = ReturnFormat.DICT,
-    ) -> Union[Dict[str, List], pl.DataFrame, pl.LazyFrame, pd.DataFrame]:
+    ) -> Union[Dict[str, List], pl.DataFrame, pl.LazyFrame, pd.DataFrame, str]:
         """Get the list of tickers from all plugins.
 
         Args:
@@ -145,10 +169,14 @@ class MFTools:
                 Defaults to ReturnFormat.DICT. See [mftools.models.helpers.ReturnFormat] for available formats.
 
         Returns:
-            Union[Iterable[Ticker], pl.DataFrame, pd.DataFrame]: The list of tickers in the specified format.
+            Union[Dict[str, List], pl.DataFrame, pl.LazyFrame, pd.DataFrame, str]: The list of tickers in the specified format.
         """
-        df_tickers = Ticker.polars_schema.to_frame(eager=False).with_columns(
-            pl.lit(None).cast(pl.String()).alias("source_key"),
+        df_tickers = (
+            Ticker.get_polars_schema()
+            .to_frame(eager=False)
+            .with_columns(
+                pl.lit(None).cast(pl.String()).alias("source_key"),
+            )
         )
         pre_loaded_sources = defaultdict(lambda: datetime.min)
         try:
@@ -185,7 +213,7 @@ class MFTools:
                 logger.debug(f"Getting tickers from source {key}")
                 all_tickers.append(
                     handle_input(
-                        source.get_tickers(), Ticker.polars_schema
+                        source.get_tickers(), Ticker.get_polars_schema()
                     ).with_columns(pl.lit(key).alias("source_key"))
                 )
 
@@ -215,33 +243,33 @@ class MFTools:
 
         return format_output(df_tickers, format)
 
-    def get_quotes(
-        self,
-        *tickers: Union[str, Tuple[str, str]],
-        start_date: date = date.today(),
-        end_date: date = date.today(),
-        format: Union[ReturnFormat, str] = ReturnFormat.DICT,
-    ) -> Union[Iterable[pl.DataFrame], pl.DataFrame, pl.LazyFrame, pd.DataFrame]:
-        """Get the quotes for the specified tickers.
+    # def get_quotes(
+    #     self,
+    #     *tickers: Union[str, Tuple[str, str]],
+    #     start_date: date = date.today(),
+    #     end_date: date = date.today(),
+    #     format: Union[ReturnFormat, str] = ReturnFormat.DICT,
+    # ) -> Union[Iterable[pl.DataFrame], pl.DataFrame, pl.LazyFrame, pd.DataFrame]:
+    #     """Get the quotes for the specified tickers.
 
-        Args:
-            tickers (Union[str, Tuple[str, str]]): The tickers to get quotes for.
-                This can be a single symbol, a list of symbols, or a list of tuples
-                containing the symbol and the source key.
-                If source key is not specified, all available sources are checked.
+    #     Args:
+    #         tickers (Union[str, Tuple[str, str]]): The tickers to get quotes for.
+    #             This can be a single symbol, a list of symbols, or a list of tuples
+    #             containing the symbol and the source key.
+    #             If source key is not specified, all available sources are checked.
 
-            start_date (date): The start date for the quotes. Defaults to today.
+    #         start_date (date): The start date for the quotes. Defaults to today.
 
-            end_date (date): The end date for the quotes. Defaults to today.
+    #         end_date (date): The end date for the quotes. Defaults to today.
 
-            format (ReturnFormat): The format of the returned tickers.
-                Defaults to ReturnFormat.DICT. See [mftools.models.helpers.ReturnFormat] for available formats.
+    #         format (ReturnFormat): The format of the returned tickers.
+    #             Defaults to ReturnFormat.DICT. See [mftools.models.helpers.ReturnFormat] for available formats.
 
-        Returns:
-            Union[Iterable[pl.DataFrame], pl.DataFrame, pd.DataFrame]: The quotes in the specified format.
+    #     Returns:
+    #         Union[Iterable[pl.DataFrame], pl.DataFrame, pd.DataFrame]: The quotes in the specified format.
 
-        Example:
-            >>> mftools = MFTools()
-            >>> quotes = mftools.get_quotes("500209", "500210", ("500211", "amfi"))
-        """
-        pass
+    #     Example:
+    #         >>> mftools = MFTools()
+    #         >>> quotes = mftools.get_quotes("500209", "500210", ("500211", "amfi"))
+    #     """
+    #     pass

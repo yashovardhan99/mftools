@@ -3,7 +3,7 @@
 from pathlib import Path
 import pandas as pd
 import platformdirs
-from typing import Any, Dict, Iterable, Optional, TypeVar, Union, List
+from typing import Any, Dict, Iterable, NamedTuple, Optional, TypeVar, Union, List
 import polars as pl
 
 from mftools.models.helpers import ReturnFormat
@@ -15,26 +15,22 @@ def get_tickers_dir() -> Path:
 
 
 def handle_input(
-    data: Union[pl.DataFrame, pl.LazyFrame, pd.DataFrame, Iterable[dict[str, Any]]],
+    data: Union[pl.DataFrame, pl.LazyFrame, pd.DataFrame, Iterable[NamedTuple]],
     schema: Optional[pl.Schema] = None,
 ) -> pl.LazyFrame:
     """Handle input data and convert it to a Polars LazyFrame."""
-    if isinstance(data, pl.DataFrame, pl.LazyFrame):
+    if isinstance(data, (pl.DataFrame, pl.LazyFrame)):
         return data.lazy()
     elif isinstance(data, pd.DataFrame):
         return pl.from_pandas(data, schema_overrides=schema).lazy()
-    elif isinstance(data, Iterable):
-        return pl.from_dicts(data, schema=schema).lazy()
     else:
-        raise ValueError(
-            "Unsupported input type. Must be a DataFrame or iterable of dicts."
-        )
+        return pl.from_dicts(map(NamedTuple._asdict, data), schema=schema).lazy()
 
 
 def format_output(
     data: Union[pl.DataFrame, pl.LazyFrame],
     format: Union[ReturnFormat, str],
-) -> Union[Dict[str, List[Any]], pl.DataFrame, pl.LazyFrame, pd.DataFrame]:
+) -> Union[Dict[str, List[Any]], pl.DataFrame, pl.LazyFrame, pd.DataFrame, str]:
     """Format the output based on the specified format."""
     data = data.lazy()
     if isinstance(format, str):
@@ -56,15 +52,15 @@ def format_output(
         raise ValueError(f"Unsupported format: {format}")
 
 
-Frame = TypeVar("PolarsFrame", pl.DataFrame, pl.LazyFrame)
+PolarsFrame = TypeVar("PolarsFrame", pl.DataFrame, pl.LazyFrame)
 
 
 def apply_filters(
-    frame: Frame,
+    frame: PolarsFrame,
     source_keys: Optional[list[str]],
     filters: Optional[dict[str, list[str]]],
     schema: Optional[pl.Schema] = None,
-) -> Frame:
+) -> PolarsFrame:
     """Filter records based on source keys and other filters.
 
     All filters are combined using OR. The keys of the dictionary are

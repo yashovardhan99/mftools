@@ -4,54 +4,34 @@ import abc
 from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, NamedTuple, Union
 
 import pandas as pd
 import polars as pl
 
 
-class Ticker:
+class Ticker(NamedTuple):
     """Class to hold ticker information."""
 
-    polars_schema = pl.Schema(
-        {
-            "symbol": pl.String(),
-            "name": pl.String(),
-            "isin": pl.String(),
-        }
-    )
+    symbol: str
+    name: str
+    isin: Optional[str]
 
-    def __init__(
-        self,
-        symbol: str,
-        name: str,
-        isin: Optional[str],
-    ):
-        """Initialize the ticker."""
-        self.symbol = symbol
-        self.name = name
-        self.isin = isin
-
-    def __repr__(self):
-        """Return a string representation of the ticker."""
-        return f'Ticker(symbol="{self.symbol}", name="{self.name}", isin="{self.isin}")'
-
-    def to_dict(self):
-        """Convert the ticker to a dictionary."""
-        return {
-            "symbol": self.symbol,
-            "name": self.name,
-            "isin": self.isin,
-        }
+    @classmethod
+    def get_polars_schema(cls) -> pl.Schema:
+        """Get the Polars schema for the Ticker class."""
+        return pl.Schema(
+            {
+                "symbol": pl.String(),
+                "name": pl.String(),
+                "isin": pl.String(),
+            }
+        )
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Ticker":
         """Create a Ticker instance from a dictionary."""
-        return cls(
-            symbol=data.get("symbol"),
-            name=data.get("name"),
-            isin=data.get("isin"),
-        )
+        return cls(**data)
 
 
 class PriceData:
