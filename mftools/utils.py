@@ -3,7 +3,8 @@
 from pathlib import Path
 import pandas as pd
 import platformdirs
-from typing import Any, Dict, Iterable, NamedTuple, Optional, TypeVar, Union, List
+from typing import Any, NamedTuple, Optional, TypeVar, Union
+from collections.abc import Iterable
 import polars as pl
 
 from mftools.models.helpers import ReturnFormat
@@ -30,7 +31,7 @@ def handle_input(
 def format_output(
     data: Union[pl.DataFrame, pl.LazyFrame],
     format: Union[ReturnFormat, str],
-) -> Union[Dict[str, List[Any]], pl.DataFrame, pl.LazyFrame, pd.DataFrame, str]:
+) -> Union[dict[str, list[Any]], pl.DataFrame, pl.LazyFrame, pd.DataFrame, str]:
     """Format the output based on the specified format."""
     data = data.lazy()
     if isinstance(format, str):

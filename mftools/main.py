@@ -13,7 +13,8 @@ from mftools.models.plugins import Plugin
 from mftools.tickers import load_tickers, save_tickers
 from mftools.utils import format_output, apply_filters, handle_input
 
-from typing import Dict, Iterable, List, Literal, Optional, Union, overload
+from typing import Literal, Optional, Union, overload
+from collections.abc import Iterable
 import pandas as pd
 import polars as pl
 
@@ -58,7 +59,7 @@ class MFTools:
         """Initialize the MFTools class."""
         logger.debug("Initializing MFTools")
         local_plugins = _import_local_plugins()
-        self.plugins: List[Plugin] = []
+        self.plugins: list[Plugin] = []
         for plugin in local_plugins:
             logger.debug(f"Loaded plugin: {plugin.get_info()}")
             self.plugins.append(plugin)
@@ -73,7 +74,7 @@ class MFTools:
         else:
             raise TypeError("Plugin must be an instance of Plugin class")
 
-    def _get_sources(self, source_keys: Optional[List[str]] = None) -> List[Source]:
+    def _get_sources(self, source_keys: Optional[list[str]] = None) -> list[Source]:
         """Get the list of sources from all plugins."""
         logger.debug("Getting sources from all plugins")
         sources = []
@@ -86,7 +87,7 @@ class MFTools:
         return sources
 
     def get_sources(
-        self, source_keys: Optional[List[str]] = None
+        self, source_keys: Optional[list[str]] = None
     ) -> Iterable[SourceInfo]:
         """Get the list of sources from all plugins.
 
@@ -110,49 +111,49 @@ class MFTools:
     @overload
     def get_tickers(
         self,
-        filters: Optional[Dict[str, List[str]]] = None,
-        source_keys: Optional[List[str]] = None,
+        filters: Optional[dict[str, list[str]]] = None,
+        source_keys: Optional[list[str]] = None,
         format: Literal[ReturnFormat.DICT] = ...,
-    ) -> Dict[str, List]: ...
+    ) -> dict[str, list]: ...
 
     @overload
     def get_tickers(
         self,
-        filters: Optional[Dict[str, List[str]]] = None,
-        source_keys: Optional[List[str]] = None,
+        filters: Optional[dict[str, list[str]]] = None,
+        source_keys: Optional[list[str]] = None,
         format: Literal[ReturnFormat.PL_DATAFRAME] = ...,
     ) -> pl.DataFrame: ...
 
     @overload
     def get_tickers(
         self,
-        filters: Optional[Dict[str, List[str]]] = None,
-        source_keys: Optional[List[str]] = None,
+        filters: Optional[dict[str, list[str]]] = None,
+        source_keys: Optional[list[str]] = None,
         format: Literal[ReturnFormat.PL_LAZYFRAME] = ...,
     ) -> pl.LazyFrame: ...
 
     @overload
     def get_tickers(
         self,
-        filters: Optional[Dict[str, List[str]]] = None,
-        source_keys: Optional[List[str]] = None,
+        filters: Optional[dict[str, list[str]]] = None,
+        source_keys: Optional[list[str]] = None,
         format: Literal[ReturnFormat.PD_DATAFRAME] = ...,
     ) -> pd.DataFrame: ...
 
     @overload
     def get_tickers(
         self,
-        filters: Optional[Dict[str, List[str]]] = None,
-        source_keys: Optional[List[str]] = None,
+        filters: Optional[dict[str, list[str]]] = None,
+        source_keys: Optional[list[str]] = None,
         format: Union[Literal[ReturnFormat.JSON], Literal[ReturnFormat.CSV]] = ...,
     ) -> str: ...
 
     def get_tickers(
         self,
-        filters: Optional[Dict[str, List[str]]] = None,
-        source_keys: Optional[List[str]] = None,
+        filters: Optional[dict[str, list[str]]] = None,
+        source_keys: Optional[list[str]] = None,
         format: Union[ReturnFormat, str] = ReturnFormat.DICT,
-    ) -> Union[Dict[str, List], pl.DataFrame, pl.LazyFrame, pd.DataFrame, str]:
+    ) -> Union[dict[str, list], pl.DataFrame, pl.LazyFrame, pd.DataFrame, str]:
         """Get the list of tickers from all plugins.
 
         Args:

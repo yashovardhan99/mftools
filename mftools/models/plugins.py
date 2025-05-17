@@ -1,7 +1,7 @@
 """Define a common interface for all plugins."""
 
 import abc
-from typing import Iterable
+from collections.abc import Iterable
 
 from mftools.models.sources import Source
 
