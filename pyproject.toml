@@ -8,14 +8,14 @@ description = "A simple python library for all your mutual fund needs."
 version = "0.1.0"
 dependencies = [
     "polars >= 1.29.0, < 2.0.0",
-    "requests >= 2.32.3, < 3.0.0",
-    "scipy >= 1.15.3, < 2.0.0",
-    "numpy >= 2.2.0, < 3.0.0",
+    "requests >= 2.32.0, < 3.0.0",
+    "scipy >= 1.13.1, < 2.0.0",
+    "numpy >= 2.0.2, < 3.0.0",
     "platformdirs >= 4.3.8, < 5.0.0",
-    "pandas >= 2.2.3, < 3.0.0",
+    "pandas >= 2.2.2, < 3.0.0",
     "pyarrow >= 20.0.0, < 21.0.0",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 authors = [
     { name = "Yashovardhan Dhanania", email = "yashovardhandhanania@gmail.com" },
 ]
@@ -46,7 +46,7 @@ releasenotes = "https://github.com/yashovardhan99/mftools/releases"
 [dependency-groups]
 testing = ["pytest >= 8.3.5, < 9.0.0", "coverage[toml] >= 7.8.0, < 8.0.0"]
 linting = ["ruff >= 0.11.9, < 0.12.0", "mypy >= 1.15.0, < 2.0.0"]
-stubs = ["pandas-stubs", "types-requests"]
+stubs = ["pandas-stubs >= 2.2.2, < 3.0.0", "types-requests >= 2.32.0, < 3.0.0"]
 dev = [
     { include-group = "testing" },
     { include-group = "linting" },
@@ -54,12 +54,22 @@ dev = [
 ]
 
 [tool.ruff.lint]
-extend-select = [
-    "D", # Docstrings
+select = [
+    "E4",
+    "E7",
+    "E9",
+    "F",
+    "D",  # Docstrings
+    "B",  # Bugbear
+    "Q",  # Quotes
+    "UP", # PyUpgrade
 ]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.ruff.format]
+docstring-code-format = true
 
 [tool.coverage.report]
 # Regexes for lines to exclude from consideration
