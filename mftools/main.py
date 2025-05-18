@@ -1,7 +1,7 @@
 """Mutual Fund utilities for Python."""
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import date, datetime
 import logging
 import importlib
 import pkgutil
@@ -10,8 +10,13 @@ from mftools.models.helpers import ReturnFormat
 from mftools.models.sources import Source, SourceInfo, Ticker
 import mftools.plugins as _local_plugins
 from mftools.models.plugins import Plugin
-from mftools.tickers import load_tickers, save_tickers
-from mftools.utils import format_output, apply_filters, handle_input
+from mftools.utils import (
+    format_output,
+    apply_filters,
+    handle_input,
+    load_tickers,
+    save_tickers,
+)
 
 from typing import Literal, Optional, Union, overload
 from collections.abc import Iterable
@@ -74,17 +79,14 @@ class MFTools:
         else:
             raise TypeError("Plugin must be an instance of Plugin class")
 
-    def _get_sources(self, source_keys: Optional[list[str]] = None) -> list[Source]:
+    def _get_sources(self, source_keys: Optional[list[str]] = None) -> Iterable[Source]:
         """Get the list of sources from all plugins."""
         logger.debug("Getting sources from all plugins")
-        sources = []
         for plugin in self.plugins:
             for source in plugin.get_sources():
                 if source_keys is None or source.get_source_key() in source_keys:
-                    sources.append(source)
+                    yield source
                     logger.debug(f"Loaded source: {source.get_source_info()}")
-        logger.debug(f"Loaded {len(sources)} sources")
-        return sources
 
     def get_sources(
         self, source_keys: Optional[list[str]] = None
@@ -145,7 +147,7 @@ class MFTools:
         self,
         filters: Optional[dict[str, list[str]]] = None,
         source_keys: Optional[list[str]] = None,
-        format: Union[Literal[ReturnFormat.JSON], Literal[ReturnFormat.CSV]] = ...,
+        format: Literal[ReturnFormat.JSON, ReturnFormat.CSV] = ...,
     ) -> str: ...
 
     def get_tickers(
@@ -206,8 +208,9 @@ class MFTools:
             key = source.get_source_key()
             if (
                 key in pre_loaded_sources
+                and source.get_source_config().ticker_refresh_interval is not None
                 and (datetime.now() - pre_loaded_sources[key])
-                < source.get_source_info().ticker_refresh_interval
+                < source.get_source_config().ticker_refresh_interval
             ):
                 logger.debug(f"Skipping source {key} as it is up to date")
             else:
@@ -241,36 +244,86 @@ class MFTools:
 
         logger.debug("Applying filters to tickers")
         df_tickers = apply_filters(df_tickers, source_keys, filters)
-
         return format_output(df_tickers, format)
 
-    # def get_quotes(
-    #     self,
-    #     *tickers: Union[str, Tuple[str, str]],
-    #     start_date: date = date.today(),
-    #     end_date: date = date.today(),
-    #     format: Union[ReturnFormat, str] = ReturnFormat.DICT,
-    # ) -> Union[Iterable[pl.DataFrame], pl.DataFrame, pl.LazyFrame, pd.DataFrame]:
-    #     """Get the quotes for the specified tickers.
+    @overload
+    def get_quotes(
+        self,
+        *tickers: str,
+        start_date: date = ...,
+        end_date: date = ...,
+        format: Literal[ReturnFormat.DICT] = ...,
+    ) -> dict[str, list]: ...
 
-    #     Args:
-    #         tickers (Union[str, Tuple[str, str]]): The tickers to get quotes for.
-    #             This can be a single symbol, a list of symbols, or a list of tuples
-    #             containing the symbol and the source key.
-    #             If source key is not specified, all available sources are checked.
+    @overload
+    def get_quotes(
+        self,
+        *tickers: str,
+        start_date: date = ...,
+        end_date: date = ...,
+        format: Literal[ReturnFormat.PL_DATAFRAME] = ...,
+    ) -> pl.DataFrame: ...
 
-    #         start_date (date): The start date for the quotes. Defaults to today.
+    @overload
+    def get_quotes(
+        self,
+        *tickers: str,
+        start_date: date = ...,
+        end_date: date = ...,
+        format: Literal[ReturnFormat.PL_LAZYFRAME] = ...,
+    ) -> pl.LazyFrame: ...
 
-    #         end_date (date): The end date for the quotes. Defaults to today.
+    @overload
+    def get_quotes(
+        self,
+        *tickers: str,
+        start_date: date = ...,
+        end_date: date = ...,
+        format: Literal[ReturnFormat.PD_DATAFRAME] = ...,
+    ) -> pd.DataFrame: ...
 
-    #         format (ReturnFormat): The format of the returned tickers.
-    #             Defaults to ReturnFormat.DICT. See [mftools.models.helpers.ReturnFormat] for available formats.
+    @overload
+    def get_quotes(
+        self,
+        *tickers: str,
+        start_date: date = ...,
+        end_date: date = ...,
+        format: Literal[ReturnFormat.CSV, ReturnFormat.JSON] = ...,
+    ) -> str: ...
 
-    #     Returns:
-    #         Union[Iterable[pl.DataFrame], pl.DataFrame, pd.DataFrame]: The quotes in the specified format.
+    def get_quotes(
+        self,
+        *tickers: Union[str, tuple[str, str]],
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        format: Union[ReturnFormat, str] = ReturnFormat.DICT,
+    ) -> Union[dict[str, list], pl.DataFrame, pl.LazyFrame, pd.DataFrame, str]:
+        """Get the quotes for the specified tickers.
 
-    #     Example:
-    #         >>> mftools = MFTools()
-    #         >>> quotes = mftools.get_quotes("500209", "500210", ("500211", "amfi"))
-    #     """
-    #     pass
+        Args:
+            tickers (Union[str, Tuple[str, str]]): The tickers to get quotes for.
+
+                This can be a single symbol, a list of symbols, or a list of tuples
+                containing the symbol and the source key.
+                If source key is not specified, the pre-existing tickers are checked first.
+                If not found, all out-dated sources are checked.
+
+            start_date (Optional[date]): The start date for the quotes (inclusive). If None, defaults to today.
+
+            end_date (Optional[date]): The end date for the quotes (inclusive). If None, defaults to today.
+                The end date must be greater than or equal to the start date.
+
+            format (ReturnFormat): The format of the returned tickers.
+                Defaults to ReturnFormat.DICT. See [mftools.models.helpers.ReturnFormat] for available formats.
+
+        Returns:
+            Union[Iterable[pl.DataFrame], pl.DataFrame, pd.DataFrame]: The quotes in the specified format.
+
+        Raises:
+            ValueError: If the end date is before the start date.
+
+        Example:
+            >>> mftools = MFTools()
+            >>> quotes = mftools.get_quotes("500209", "500210", ("500211", "amfi"))
+        """
+        raise NotImplementedError("TODO")

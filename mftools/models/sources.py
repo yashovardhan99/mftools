@@ -3,11 +3,12 @@
 import abc
 from datetime import date, timedelta
 from decimal import Decimal
-from pathlib import Path
-from typing import Any, Optional, NamedTuple, Union
+from enum import Flag, auto
+from typing import Optional, NamedTuple
 
-import pandas as pd
 import polars as pl
+
+from mftools.models.types import QuotesIterable, TickersIterable
 
 
 class Ticker(NamedTuple):
@@ -28,46 +29,91 @@ class Ticker(NamedTuple):
             }
         )
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Ticker":
-        """Create a Ticker instance from a dictionary."""
-        return cls(**data)
 
-
-class PriceData:
+class Quote(NamedTuple):
     """Class to hold price data."""
 
-    def __init__(self, date: date, price: Decimal):
-        """Initialize the price data."""
-        self.date = date
-        self.price = price
+    symbol: str
+    date: date
+    price: Decimal
 
-    def __repr__(self):
-        """Return a string representation of the price data."""
-        return f'PriceData(date="{self.date}", price={self.price})'
+    @classmethod
+    def get_polars_schema(cls) -> pl.Schema:
+        """Get the Polars schema for the Quote class."""
+        return pl.Schema(
+            {
+                "symbol": pl.String(),
+                "date": pl.Date(),
+                "price": pl.Decimal(scale=4),
+            }
+        )
 
 
-class SourceInfo:
+class SourceInfo(NamedTuple):
     """Class to hold source information."""
 
-    def __init__(
-        self,
-        name: str,
-        description: str,
-        key: str,
-        ticker_refresh_interval: timedelta = timedelta(days=1),
-        data_refresh_interval: timedelta = timedelta(days=1),
-    ):
-        """Initialize the source info."""
-        self.name = name
-        self.description = description
-        self.key = key
-        self.ticker_refresh_interval = ticker_refresh_interval
-        self.data_refresh_interval = data_refresh_interval
+    name: str
+    description: str
+    key: str
+    version: int
+    """This will later add support for source migrations."""
 
-    def __repr__(self):
-        """Return a string representation of the source info."""
-        return f'SourceInfo(name="{self.name}", description="{self.description}", key="{self.key}", ticker_refresh_interval={self.ticker_refresh_interval}, data_refresh_interval={self.data_refresh_interval})'
+
+class SourceStrategy(Flag):
+    """Enum for source strategies.
+
+    This enum defines the different strategies for data sources.
+    Strategies can be combined using bitwise OR.
+    These help in determining how to fetch and store data from the source.
+    For example, if the source only supports fetching data for all tickers at a time,
+    MFTools will store the data and use them in the future automatically.
+    """
+
+    DEFAULT = 0
+    """Use this when the source does not require any special strategy.
+    
+    Default strategy:
+    - The source only fetches data for the provided tickers (or all tickers if none are provided)."""
+
+    ALL_TICKERS = auto()
+    """The source fetches data for all tickers at once.
+    Used for sources that do not support fetching data only for a list of provided tickers.
+    """
+
+
+class SourceConfig(NamedTuple):
+    """Class to hold source configuration."""
+
+    ticker_refresh_interval: Optional[timedelta] = None
+    """The time interval at which the source can be checked for new tickers.
+    
+    If this value is None, the source will not be checked for new tickers.
+    Default is None."""
+    data_refresh_interval: timedelta = timedelta(days=1)
+    """The time interval at which the source can be checked for new data.
+    
+    Note that this only applies to new data. Historical data, once fetched,
+    will not be fetched again.
+    
+    This frequency will be ticker-specific unless the source uses the `ALL_TICKERS` strategy,
+    in which case it will be source-specific."""
+    data_group_period: Optional[timedelta] = None
+    """The time period for which data can be grouped at source.
+    
+    This is used to limit the amount of calls made to the source.
+    For example, if the source can return data for 1 month at a time,
+    this should be set to 30 days.
+
+    If this value is None, the data will not be grouped.
+    
+    This value will be passed to `polars.DataFrame.group_by_dynamic`
+    to group the data by the specified time period.
+
+    Default is None.
+    """
+    source_strategy: SourceStrategy = SourceStrategy.DEFAULT
+    """The strategy to use for the source. Multiple strategies can be combined using bitwise OR.
+    This is used to determine how to fetch and store data from the source."""
 
 
 class Source(abc.ABC):
@@ -78,30 +124,34 @@ class Source(abc.ABC):
         super().__init__()
 
     @abc.abstractmethod
-    def download_historical_data(
+    def get_quotes(
         self,
-        raw_file_path: Path,
-        start_date: date,
-        end_date: date,
-        tickers: Optional[list[str]] = None,
-    ) -> bool:
-        """Download historical data."""
+        *tickers: str,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> QuotesIterable:
+        """Get the quotes for the given tickers.
+
+        Args:
+            *tickers (str): The list of tickers to get quotes for. If empty, all tickers will be fetched.
+            start_date (Optional[date]): The start date for the quotes. If none, the source should return the latest data.
+            end_date (Optional[date]): The end date for the quotes. If none, the source should return the latest data.
+
+            The source can return data for all tickers irrespective of the provided tickers
+            if it uses the `ALL_TICKERS` strategy.
+
+        Note:
+        - If both start_date and end_date are None, the source should return the latest data.
+        - If only one date is provided, the source should return data for that date.
+        - Date range would never exceed the `data_group_period` specified in the source config.
+
+        Returns:
+            An iterable of Quote objects or a Polars DataFrame or a Pandas DataFrame.
+        """
         raise NotImplementedError("Subclasses must implement this method.")
 
     @abc.abstractmethod
-    def download_latest_data(
-        self, raw_file_path: Path, tickers: Optional[list[str]] = None
-    ) -> bool:
-        """Download latest data."""
-        raise NotImplementedError("Subclasses must implement this method.")
-
-    @abc.abstractmethod
-    def process_data(self, raw_file_path: Path) -> Union[pl.DataFrame, pd.DataFrame]:
-        """Process the downloaded data."""
-        raise NotImplementedError("Subclasses must implement this method.")
-
-    @abc.abstractmethod
-    def get_tickers(self) -> Union[list[Ticker], pl.DataFrame, pd.DataFrame]:
+    def get_tickers(self) -> TickersIterable:
         """Get the list of tickers."""
         raise NotImplementedError("Subclasses must implement this method.")
 
@@ -115,4 +165,10 @@ class Source(abc.ABC):
     @abc.abstractmethod
     def get_source_info(cls) -> SourceInfo:
         """Get source information."""
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    @classmethod
+    @abc.abstractmethod
+    def get_source_config(cls) -> SourceConfig:
+        """Get source configuration."""
         raise NotImplementedError("Subclasses must implement this method.")

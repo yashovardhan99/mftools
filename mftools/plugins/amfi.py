@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 import mftools
 from mftools.models.plugins import Plugin, PluginInfo
-from mftools.models.sources import Source, SourceInfo
+from mftools.models.sources import Source, SourceConfig, SourceInfo
 import requests
 import tempfile
 import polars as pl
@@ -92,6 +92,46 @@ class AMFISource(Source):
         # Implement the logic to process the downloaded data.
         pass
 
+    def get_quotes(self, *_, start_date=None, end_date=None):
+        """Get quotes for the all tickers."""
+        url = self.LATEST_URL
+        if start_date and end_date:
+            url = self.HISTORICAL_URL.format(
+                frm_dt=start_date.strftime("%d-%b-%Y"),
+                to_dt=end_date.strftime("%d-%b-%Y"),
+            )
+        elif start_date:
+            url = self.HISTORICAL_URL.format(
+                frm_dt=start_date.strftime("%d-%b-%Y"),
+                to_dt=start_date.strftime("%d-%b-%Y"),
+            )
+        elif end_date:
+            url = self.HISTORICAL_URL.format(
+                frm_dt=end_date.strftime("%d-%b-%Y"),
+                to_dt=end_date.strftime("%d-%b-%Y"),
+            )
+
+        with tempfile.TemporaryDirectory() as d:
+            file_path = Path(d, "amfi_data.txt")
+            downloaded = self._download_file(url, file_path)
+            if not downloaded:
+                logger.error("Failed to download data.")
+                return []
+
+            df = pl.scan_csv(
+                file_path,
+                separator=";",
+                null_values=["N.A.", "-"],
+                infer_schema=False,
+            )
+            df = df.drop_nulls(subset=["Date"])
+            df = df.select(
+                pl.col("Scheme Code").alias("symbol").cast(pl.String()),
+                pl.col("Date").alias("date").str.strptime(pl.Date, "%d-%b-%Y"),
+                pl.col("Net Asset Value").alias("price").cast(pl.Decimal(None, 4)),
+            )
+            return df
+
     def get_tickers(self):
         """Get the list of tickers."""
         with tempfile.TemporaryDirectory() as d:
@@ -108,7 +148,7 @@ class AMFISource(Source):
                     pl.col("Scheme Code").alias("symbol"),
                     pl.col("Scheme Name").alias("name"),
                     pl.coalesce(pl.col("^ISIN .*$")).alias("isin"),
-                ).collect()
+                )
             else:
                 return list()
 
@@ -124,8 +164,16 @@ class AMFISource(Source):
             name="Mutual Fund India",
             description="Data source for all Indian mutual funds, sourced from AMFI.",
             key=AMFISource.get_source_key(),
+            version=1,
+        )
+
+    @classmethod
+    def get_source_config(cls):
+        """Return source configuration."""
+        return SourceConfig(
             ticker_refresh_interval=timedelta(days=7),
             data_refresh_interval=timedelta(days=1),
+            data_group_period=timedelta(days=30),
         )
 
 
