@@ -11,4 +11,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Basic project structure
 
-[unreleased]: https://github.com/yashovardhan99/mftools/commits/main
+[unreleased]: https://github.com/yashovardhan99/niveshpy/commits/main

@@ -15,8 +15,8 @@ from pathlib import Path
 import pytest
 import requests
 
-from mftools.plugins import amfi
-from mftools.models.plugins import PluginInfo, Plugin
+from niveshpy.plugins import amfi
+from niveshpy.models.plugins import PluginInfo, Plugin
 import datetime
 
 

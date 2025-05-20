@@ -1,4 +1,4 @@
-"""Base models for MFTools."""
+"""Base models for NiveshPy."""
 
 from datetime import date, timedelta
 from decimal import Decimal
@@ -63,7 +63,7 @@ class SourceStrategy(Flag):
     Strategies can be combined using bitwise OR.
     These help in determining how to fetch and store data from the source.
     For example, if the source only supports fetching data for all tickers at a time,
-    MFTools will store the data and use them in the future automatically.
+    NiveshPy will store the data and use them in the future automatically.
     """
 
     DEFAULT = 0

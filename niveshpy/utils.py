@@ -1,4 +1,4 @@
-"""Utility functions for mftools."""
+"""Utility functions for niveshpy."""
 
 from datetime import date
 import logging
@@ -8,10 +8,10 @@ import platformdirs
 from typing import Any, Optional, Union
 import polars as pl
 
-from mftools.models.base import Quote
-from mftools.models.helpers import ReturnFormat
-from mftools.models.types import (
-    MFToolsIterable,
+from niveshpy.models.base import Quote
+from niveshpy.models.helpers import ReturnFormat
+from niveshpy.models.types import (
+    NiveshPyIterable,
     PolarsFrameType,
     PolarsFrame,
 )
@@ -21,16 +21,16 @@ logger = logging.getLogger(__name__)
 
 def get_tickers_dir() -> Path:
     """Get the directory for tickers."""
-    return platformdirs.user_data_path("mftools").joinpath("tickers")
+    return platformdirs.user_data_path("niveshpy").joinpath("tickers")
 
 
 def get_quotes_dir() -> Path:
     """Get the directory for quotes."""
-    return platformdirs.user_data_path("mftools").joinpath("quotes")
+    return platformdirs.user_data_path("niveshpy").joinpath("quotes")
 
 
 def handle_input(
-    data: MFToolsIterable,
+    data: NiveshPyIterable,
     schema: Optional[pl.Schema] = None,
 ) -> pl.LazyFrame:
     """Handle input data and convert it to a Polars LazyFrame."""

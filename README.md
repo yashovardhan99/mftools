@@ -1,10 +1,10 @@
-# mftools
+# NiveshPy
 
-mftools is a financial library designed for managing mutual funds and investment portfolios. It provides functionalities to fetch fund prices, manage portfolio transactions, and calculate performance metrics.
+NiveshPy is a financial library designed for managing mutual funds and investment portfolios. It provides functionalities to fetch fund prices, manage portfolios, and calculate performance.
 
-## Usage
+## Work in progress
 
-This section will be updated once project is usable.
+This project is a work in progress. The public API is still in development and not usable.
 
 ## License
 

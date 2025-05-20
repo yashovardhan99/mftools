@@ -1,4 +1,4 @@
-"""Helper models for MFTools."""
+"""Helper models for NiveshPy."""
 
 from enum import Enum
 
@@ -11,7 +11,7 @@ class ReturnFormat(Enum):
     Attributes:
         DICT: Format as a dictionary mapping column names as keys.
         PL_DATAFRAME: Format as a Polars DataFrame.
-        PL_LAZYFRAME: Format as a Polars LazyFrame. This is the internal format used by mftools.
+        PL_LAZYFRAME: Format as a Polars LazyFrame. This is the internal format used by niveshpy.
         PD_DATAFRAME: Format as a Pandas DataFrame.
         JSON: Format as a JSON string.
         CSV: Format as a CSV string.

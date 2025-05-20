@@ -3,7 +3,7 @@
 import abc
 from collections.abc import Iterable
 
-from mftools.models.sources import Source
+from niveshpy.models.sources import Source
 
 
 class PluginInfo:
