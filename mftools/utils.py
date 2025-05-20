@@ -1,17 +1,22 @@
 """Utility functions for mftools."""
 
+from datetime import date
+import logging
 from pathlib import Path
 import pandas as pd
 import platformdirs
-from typing import Any, NamedTuple, Optional, Union
+from typing import Any, Optional, Union
 import polars as pl
 
+from mftools.models.base import Quote
 from mftools.models.helpers import ReturnFormat
 from mftools.models.types import (
     MFToolsIterable,
     PolarsFrameType,
     PolarsFrame,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def get_tickers_dir() -> Path:
@@ -34,7 +39,7 @@ def handle_input(
     elif isinstance(data, pd.DataFrame):
         return pl.from_pandas(data, schema_overrides=schema).lazy()
     else:
-        return pl.from_dicts(map(NamedTuple._asdict, data), schema=schema).lazy()
+        return pl.from_dicts(map(lambda x: x._asdict(), data), schema=schema).lazy()
 
 
 def format_output(
@@ -113,41 +118,83 @@ def load_tickers() -> pl.LazyFrame:
     return pl.scan_parquet(file_path)
 
 
-def save_all_tickers_availability(availability: PolarsFrameType) -> None:
-    """Save availability for all sources with ALL_TICKERS strategy."""
-    file_path = get_quotes_dir().joinpath("all_tickers_availability.parquet")
+_availability_schema = pl.Schema(
+    {
+        "source_key": pl.Utf8,
+        "date": pl.Date,
+    }
+)
+
+
+def mark_quotes_as_available(
+    source_key: str,
+    start_date: date,
+    end_date: date,
+) -> None:
+    """Mark quotes as available for a given source key and date range.
+
+    This is only applicable for sources with ALL_TICKERS strategy.
+    """
+    logger.debug(
+        f"Marking quotes as available for source_key={source_key}, "
+        f"start_date={start_date}, end_date={end_date}"
+    )
+    file_path = get_quotes_dir().joinpath("availability.parquet")
     if not file_path.parent.exists():
         file_path.parent.mkdir(parents=True, exist_ok=True)
-    availability.lazy().collect().write_parquet(file_path)
+
+    if file_path.exists():
+        df_availability = pl.read_parquet(file_path)
+    else:
+        df_availability = _availability_schema.to_frame(eager=True)
+
+    df_new_availability = (
+        pl.date_range(start=start_date, end=end_date, interval="1d", eager=True)
+        .to_frame("date")
+        .with_columns(pl.lit(source_key).alias("source_key"))
+    )
+
+    df_availability = df_availability.update(
+        df_new_availability,
+        on=["source_key", "date"],
+        how="full",
+    )
+    df_availability.write_parquet(file_path)
 
 
-def load_all_tickers_availability() -> pl.LazyFrame:
-    """Load availability for all sources with ALL_TICKERS strategy."""
-    file_path = get_quotes_dir().joinpath("all_tickers_availability.parquet")
+def check_quotes_availability(
+    source_key: str,
+    start_date: date,
+    end_date: date,
+) -> pl.Series:
+    """Check if quotes are available for a given source key and date range.
+
+    This is only applicable for sources with ALL_TICKERS strategy.
+    """
+    file_path = get_quotes_dir().joinpath("availability.parquet")
     if not file_path.exists():
-        raise FileNotFoundError(f"File {file_path} does not exist.")
-    return pl.scan_parquet(file_path)
+        return _availability_schema.to_frame(eager=True).select("date").to_series()
+
+    df_availability = pl.read_parquet(file_path)
+    df_availability = df_availability.filter(
+        (pl.col("source_key") == source_key)
+        & (pl.col("date").is_between(start_date, end_date))
+    )
+    return df_availability.select("date").to_series()
 
 
-def save_default_availability(availability: PolarsFrameType, source_key: str) -> None:
-    """Save availability for a source with DEFAULT strategy."""
-    file_path = get_quotes_dir().joinpath(f"default_availability_{source_key}.parquet")
-    if not file_path.parent.exists():
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-    availability.lazy().collect().write_parquet(file_path)
-
-
-def load_default_availability(source_key: str) -> pl.LazyFrame:
-    """Load availability from a parquet file."""
-    file_path = get_quotes_dir().joinpath(f"default_availability_{source_key}.parquet")
-    if not file_path.exists():
-        raise FileNotFoundError(f"File {file_path} does not exist.")
-    return pl.scan_parquet(file_path)
-
-
-def save_quotes(quotes: PolarsFrameType, source_key: str) -> None:
+def save_quotes(quotes: pl.DataFrame, source_key: str) -> None:
     """Save quotes to a parquet file."""
     file_path = get_quotes_dir().joinpath(f"quotes_{source_key}.parquet")
     if not file_path.parent.exists():
         file_path.parent.mkdir(parents=True, exist_ok=True)
-    quotes.lazy().collect().write_parquet(file_path)
+    quotes.write_parquet(file_path)
+
+
+def load_quotes(source_key: str) -> pl.LazyFrame:
+    """Load quotes from a parquet file."""
+    file_path = get_quotes_dir().joinpath(f"quotes_{source_key}.parquet")
+    if not file_path.exists():
+        logger.info(f"File {file_path} does not exist.")
+        return Quote.get_polars_schema().to_frame(eager=False)
+    return pl.scan_parquet(file_path)

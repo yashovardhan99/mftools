@@ -6,7 +6,7 @@ from collections.abc import Iterable
 import polars as pl
 import pandas as pd
 
-from mftools.models.sources import Quote, SourceConfig, SourceInfo, Ticker
+from mftools.models.base import Quote, SourceConfig, SourceInfo, Ticker
 
 # Type Aliases
 PolarsFrameType = Union[pl.DataFrame, pl.LazyFrame]
