@@ -1,4 +1,4 @@
-"""Type aliases for MFTools models."""
+"""Type aliases for NiveshPy models."""
 
 from typing import TypeVar, Union
 from collections.abc import Iterable
@@ -6,20 +6,20 @@ from collections.abc import Iterable
 import polars as pl
 import pandas as pd
 
-from mftools.models.base import Quote, SourceConfig, SourceInfo, Ticker
+from niveshpy.models.base import Quote, SourceConfig, SourceInfo, Ticker
 
 # Type Aliases
 PolarsFrameType = Union[pl.DataFrame, pl.LazyFrame]
 Frame = Union[PolarsFrameType, pd.DataFrame]
 
-MFToolsType = Union[Ticker, Quote, SourceInfo, SourceConfig]
+NiveshPyType = Union[Ticker, Quote, SourceInfo, SourceConfig]
 
 QuotesIterable = Union[Iterable[Quote], Frame]
 TickersIterable = Union[Iterable[Ticker], Frame]
 
-MFToolsIterable = Union[Frame, Iterable[MFToolsType]]
+NiveshPyIterable = Union[Frame, Iterable[NiveshPyType]]
 
-MFToolsOutputType = Union[
+NiveshPyOutputType = Union[
     dict[str, list], pl.DataFrame, pl.LazyFrame, pd.DataFrame, str
 ]
 

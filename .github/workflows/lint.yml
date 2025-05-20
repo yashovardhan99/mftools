@@ -7,7 +7,7 @@ on:
   push:
     branches: ["main"]
     paths:
-      - "mftools/**"
+      - "niveshpy/**"
       - ".github/workflows/lint.yml"
       - "pyproject.toml"
   pull_request:
@@ -50,4 +50,4 @@ jobs:
 
       - name: Run MyPy
         run: |
-          mypy --ignore-missing-imports mftools
+          mypy --ignore-missing-imports niveshpy

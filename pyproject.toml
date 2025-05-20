@@ -3,8 +3,8 @@ requires = ["hatchling >= 1.27.0, < 2.0.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "mftools"
-description = "A simple python library for all your mutual fund needs."
+name = "NiveshPy"
+description = "A simple python library for all your investment needs."
 version = "0.1.0"
 dependencies = [
     "polars >= 1.29.0, < 2.0.0",
@@ -35,13 +35,13 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "http://github.com/yashovardhan99/mftools"
+Homepage = "http://github.com/yashovardhan99/niveshpy"
 # Documentation = "https://readthedocs.org"
-Repository = "https://github.com/yashovardhan99/mftools.git"
-Issues = "http://github.com/yashovardhan99/mftools/issues"
-Changelog = "http://github.com/yashovardhan99/mftools/blob/master/CHANGELOG.md"
-funding = "https://github.com/yashovardhan99/mftools"
-releasenotes = "https://github.com/yashovardhan99/mftools/releases"
+Repository = "https://github.com/yashovardhan99/niveshpy.git"
+Issues = "http://github.com/yashovardhan99/niveshpy/issues"
+Changelog = "http://github.com/yashovardhan99/niveshpy/blob/master/CHANGELOG.md"
+funding = "https://github.com/yashovardhan99/niveshpy"
+releasenotes = "https://github.com/yashovardhan99/niveshpy/releases"
 
 [dependency-groups]
 testing = ["pytest >= 8.3.5, < 9.0.0", "coverage[toml] >= 7.8.0, < 8.0.0"]

@@ -1,12 +1,12 @@
-"""A built-in plugin for MFTools that provides AMFI as a source."""
+"""A built-in plugin for NiveshPy that provides AMFI as a source."""
 
 from datetime import timedelta
 import logging
 from pathlib import Path
-import mftools
-from mftools.models.base import SourceConfig, SourceInfo, SourceStrategy
-from mftools.models.plugins import Plugin, PluginInfo
-from mftools.models.sources import Source
+import niveshpy
+from niveshpy.models.base import SourceConfig, SourceInfo, SourceStrategy
+from niveshpy.models.plugins import Plugin, PluginInfo
+from niveshpy.models.sources import Source
 import requests
 import tempfile
 import polars as pl
@@ -15,12 +15,12 @@ logger = logging.getLogger(__name__)
 
 
 class AMFIPlugin(Plugin):
-    """AMFI Plugin for MFTools."""
+    """AMFI Plugin for NiveshPy."""
 
     plugin_info = PluginInfo(
         name="AMFI",
-        description="AMFI plugin for MFTools",
-        version=mftools.__version__,
+        description="AMFI plugin for NiveshPy",
+        version=niveshpy.__version__,
         author="Yashovardhan Dhanania",
         author_email="",
     )
@@ -43,7 +43,7 @@ class AMFIPlugin(Plugin):
 
 
 class AMFISource(Source):
-    """AMFI Source for MFTools."""
+    """AMFI Source for NiveshPy."""
 
     LATEST_URL = "http://amfiindia.com/spages/NAVAll.txt"
     HISTORICAL_URL = "https://portal.amfiindia.com/DownloadNAVHistoryReport_Po.aspx?frmdt={frm_dt}&todt={to_dt}"
@@ -158,5 +158,5 @@ class AMFISource(Source):
 
 
 def register_plugin() -> AMFIPlugin:
-    """Register the plugin with MFTools."""
+    """Register the plugin with NiveshPy."""
     return AMFIPlugin()

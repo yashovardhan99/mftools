@@ -7,12 +7,12 @@ import importlib
 import pkgutil
 import warnings
 
-from mftools.models.helpers import ReturnFormat
-from mftools.models.sources import Source
-from mftools.models.base import Quote, SourceInfo, SourceStrategy, Ticker
-import mftools.plugins as _local_plugins
-from mftools.models.plugins import Plugin
-from mftools.utils import (
+from niveshpy.models.helpers import ReturnFormat
+from niveshpy.models.sources import Source
+from niveshpy.models.base import Quote, SourceInfo, SourceStrategy, Ticker
+import niveshpy.plugins as _local_plugins
+from niveshpy.models.plugins import Plugin
+from niveshpy.utils import (
     check_quotes_availability,
     format_output,
     apply_filters,
@@ -57,26 +57,26 @@ def _import_local_plugins() -> Iterable[Plugin]:
         (
             _import_plugin(name)
             for _, name, ispkg in pkgutil.iter_modules(
-                _local_plugins.__path__, "mftools.plugins."
+                _local_plugins.__path__, "niveshpy.plugins."
             )
             if not ispkg
         ),
     )
 
 
-class MFTools:
-    """This is the base class for MFTools."""
+class Nivesh:
+    """This is the base class for NiveshPy."""
 
     def __init__(self) -> None:
-        """Initialize the MFTools class."""
-        logger.debug("Initializing MFTools")
+        """Initialize the Nivesh class."""
+        logger.debug("Initializing Nivesh")
         local_plugins = _import_local_plugins()
         self.plugins: list[Plugin] = []
         for plugin in local_plugins:
             logger.debug(f"Loaded plugin: {plugin.get_info()}")
             self.plugins.append(plugin)
         logger.debug(f"Loaded {len(self.plugins)} plugins")
-        logger.debug("MFTools initialized")
+        logger.debug("Nivesh initialized")
 
     def register_plugin(self, plugin: Plugin):
         """Register a custom plugin."""
@@ -168,7 +168,7 @@ class MFTools:
         Args:
             filters (Optional[Dict[str, List[str]]]): Filters to apply to the tickers.
                 Defaults to None.
-                See [mftools.utils.filter_tickers] for available filters.
+                See [niveshpy.utils.filter_tickers] for available filters.
 
             source_keys (Optional[List[str]]): The source keys to filter by.
                 Defaults to None. If source_keys is specified, only the tickers
@@ -176,7 +176,7 @@ class MFTools:
                 If source_key is None, all tickers from all sources are returned.
 
             format (ReturnFormat): The format of the returned tickers.
-                Defaults to ReturnFormat.DICT. See [mftools.models.helpers.ReturnFormat] for available formats.
+                Defaults to ReturnFormat.DICT. See [niveshpy.models.helpers.ReturnFormat] for available formats.
 
         Returns:
             Union[Dict[str, List], pl.DataFrame, pl.LazyFrame, pd.DataFrame, str]: The list of tickers in the specified format.
@@ -550,7 +550,7 @@ class MFTools:
                 The end date must be greater than or equal to the start date.
 
             format (ReturnFormat): The format of the returned tickers.
-                Defaults to ReturnFormat.DICT. See [mftools.models.helpers.ReturnFormat] for available formats.
+                Defaults to ReturnFormat.DICT. See [niveshpy.models.helpers.ReturnFormat] for available formats.
 
         Returns:
             Union[Iterable[pl.DataFrame], pl.DataFrame, pd.DataFrame]: The quotes in the specified format.
@@ -559,8 +559,8 @@ class MFTools:
             ValueError: If the end date is before the start date.
 
         Example:
-            >>> mftools = MFTools()
-            >>> quotes = mftools.get_quotes("500209", "500210", ("500211", "amfi"))
+            >>> nivesh = Nivesh()
+            >>> quotes = nivesh.get_quotes("500209", "500210", ("500211", "amfi"))
         """
         if start_date and end_date and start_date > end_date:
             raise ValueError("Start date must be before end date")

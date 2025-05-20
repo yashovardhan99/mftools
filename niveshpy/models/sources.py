@@ -5,8 +5,8 @@ from datetime import date
 from typing import Optional
 
 
-from mftools.models.types import QuotesIterable, TickersIterable
-from mftools.models.base import SourceInfo, SourceConfig
+from niveshpy.models.types import QuotesIterable, TickersIterable
+from niveshpy.models.base import SourceInfo, SourceConfig
 
 
 class Source(abc.ABC):
