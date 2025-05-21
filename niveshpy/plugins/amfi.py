@@ -113,23 +113,22 @@ class AMFISource(Source):
 
     def get_tickers(self):
         """Get the list of tickers."""
-        with tempfile.TemporaryDirectory() as d:
-            file_path = Path(d, "latest.txt")
-            if self._download_file(self.LATEST_URL, file_path):
-                df = pl.scan_csv(
-                    file_path,
-                    separator=";",
-                    null_values=["N.A.", "-"],
-                    infer_schema=False,
-                )
-                df = df.drop_nulls(subset=["Date"])
-                return df.select(
-                    pl.col("Scheme Code").alias("symbol"),
-                    pl.col("Scheme Name").alias("name"),
-                    pl.coalesce(pl.col("^ISIN .*$")).alias("isin"),
-                )
-            else:
-                return list()
+        try:
+            df = pl.scan_csv(
+                self.LATEST_URL,
+                separator=";",
+                null_values=["N.A.", "-"],
+                infer_schema=False,
+            )
+            df = df.drop_nulls(subset=["Date"])
+            return df.select(
+                pl.col("Scheme Code").alias("symbol"),
+                pl.col("Scheme Name").alias("name"),
+                pl.coalesce(pl.col("^ISIN .*$")).alias("isin"),
+            )
+        except Exception:
+            logger.exception("Failed to get tickers")
+            return []
 
     @classmethod
     def get_source_key(cls):
@@ -153,7 +152,7 @@ class AMFISource(Source):
             ticker_refresh_interval=timedelta(days=7),
             data_refresh_interval=timedelta(days=1),
             data_group_period=timedelta(days=30),
-            source_strategy=SourceStrategy.ALL_TICKERS,
+            source_strategy=SourceStrategy.ALL_TICKERS | SourceStrategy.SINGLE_QUOTE,
         )
 
 

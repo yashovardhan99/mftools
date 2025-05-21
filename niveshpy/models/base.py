@@ -27,6 +27,31 @@ class Ticker(NamedTuple):
         )
 
 
+class OHLC(NamedTuple):
+    """Class to hold OHLC data."""
+
+    symbol: str
+    date: date
+    open: Decimal
+    high: Decimal
+    low: Decimal
+    close: Decimal
+
+    @classmethod
+    def get_polars_schema(cls) -> pl.Schema:
+        """Get the Polars schema for the OHLC class."""
+        return pl.Schema(
+            {
+                "symbol": pl.String(),
+                "date": pl.Date(),
+                "open": pl.Decimal(scale=4),
+                "high": pl.Decimal(scale=4),
+                "low": pl.Decimal(scale=4),
+                "close": pl.Decimal(scale=4),
+            }
+        )
+
+
 class Quote(NamedTuple):
     """Class to hold price data."""
 
@@ -70,11 +95,18 @@ class SourceStrategy(Flag):
     """Use this when the source does not require any special strategy.
     
     Default strategy:
-    - The source only fetches data for the provided tickers (or all tickers if none are provided)."""
+    - The source only fetches data for the provided tickers (or all tickers if none are provided).
+    - The source returns OHLC data.
+    """
 
     ALL_TICKERS = auto()
     """The source fetches data for all tickers at once.
     Used for sources that do not support fetching data only for a list of provided tickers.
+    """
+
+    SINGLE_QUOTE = auto()
+    """The source returns a single quote for the provided ticker.
+    Used for sources that do not support fetching OHLC data.
     """
 
 

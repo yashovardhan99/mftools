@@ -30,16 +30,15 @@ class Source(abc.ABC):
             start_date (Optional[date]): The start date for the quotes. If none, the source should return the latest data.
             end_date (Optional[date]): The end date for the quotes. If none, the source should return the latest data.
 
-            The source can return data for all tickers irrespective of the provided tickers
-            if it uses the `ALL_TICKERS` strategy.
+            This property should be ignored if the source uses the ALL_TICKERS strategy.
 
         Note:
-        - If both start_date and end_date are None, the source should return the latest data.
-        - If only one date is provided, the source should return data for that date.
-        - Date range would never exceed the `data_group_period` specified in the source config.
+            - If both start_date and end_date are None, the source should return the latest data.
+            - If only one date is provided, the source should return data for that date.
+            - Date range would never exceed the `data_group_period` specified in the source config.
 
         Returns:
-            An iterable of Quote objects or a Polars DataFrame or a Pandas DataFrame.
+            An iterable of Quote or OHLC objects or a Polars DataFrame or a Pandas DataFrame.
         """
         raise NotImplementedError("Subclasses must implement this method.")
 

@@ -1,7 +1,7 @@
 """Mutual Fund utilities for Python."""
 
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import logging
 import importlib
 import pkgutil
@@ -9,7 +9,8 @@ import warnings
 
 from niveshpy.models.helpers import ReturnFormat
 from niveshpy.models.sources import Source
-from niveshpy.models.base import Quote, SourceInfo, SourceStrategy, Ticker
+from niveshpy.models.base import OHLC, Quote, SourceInfo, SourceStrategy, Ticker
+from niveshpy.models.types import NiveshPyOutputType
 import niveshpy.plugins as _local_plugins
 from niveshpy.models.plugins import Plugin
 from niveshpy.utils import (
@@ -162,7 +163,7 @@ class Nivesh:
         filters: Optional[dict[str, list[str]]] = None,
         source_keys: Optional[list[str]] = None,
         format: Union[ReturnFormat, str] = ReturnFormat.DICT,
-    ) -> Union[dict[str, list], pl.DataFrame, pl.LazyFrame, pd.DataFrame, str]:
+    ) -> NiveshPyOutputType:
         """Get the list of tickers from all plugins.
 
         Args:
@@ -179,7 +180,7 @@ class Nivesh:
                 Defaults to ReturnFormat.DICT. See [niveshpy.models.helpers.ReturnFormat] for available formats.
 
         Returns:
-            Union[Dict[str, List], pl.DataFrame, pl.LazyFrame, pd.DataFrame, str]: The list of tickers in the specified format.
+            NiveshPyOutputType: The list of tickers in the specified format.
             The returned data has the following columns:
                 - symbol: The ticker symbol.
                 - name: The name of the ticker.
@@ -194,7 +195,7 @@ class Nivesh:
                 pl.lit(None).cast(pl.String()).alias("source_key"),
             )
         )
-        pre_loaded_sources = defaultdict(lambda: datetime.min)
+        pre_loaded_sources: dict[str, datetime] = {}
         try:
             logger.debug("Getting locally saved tickers")
             df_tickers_pre = load_tickers()
@@ -219,11 +220,11 @@ class Nivesh:
         for source in self._get_sources(source_keys):
             # This will run for all sources matching the source_keys (if applicable)
             key = source.get_source_key()
+            refresh_interval = source.get_source_config().ticker_refresh_interval
             if (
                 key in pre_loaded_sources
-                and source.get_source_config().ticker_refresh_interval is not None
-                and (datetime.now() - pre_loaded_sources[key])
-                < source.get_source_config().ticker_refresh_interval
+                and refresh_interval is not None
+                and (datetime.now() - pre_loaded_sources[key]) < refresh_interval
             ):
                 logger.debug(f"Skipping source {key} as it is up to date")
             else:
@@ -407,8 +408,13 @@ class Nivesh:
                     pl.col("date").last().alias("end_date"),
                 )
 
+        schema = (
+            Quote.get_polars_schema()
+            if SourceStrategy.SINGLE_QUOTE in source.get_source_config().source_strategy
+            else OHLC.get_polars_schema()
+        )
         # Get unavailable quotes from the source
-        new_quotes = [Quote.get_polars_schema().to_frame(eager=False)]
+        new_quotes = [schema.to_frame(eager=False)]
 
         for row in df_missing.collect().iter_rows(named=True):
             start = row.get("start_date", row.get("date"))
@@ -431,7 +437,7 @@ class Nivesh:
                 new_quotes.append(
                     handle_input(
                         source.get_quotes(start_date=start, end_date=end),
-                        schema=Quote.get_polars_schema(),
+                        schema=schema,
                     )
                 )
                 mark_quotes_as_available(
@@ -454,7 +460,7 @@ class Nivesh:
                             start_date=start,
                             end_date=end,
                         ),
-                        schema=Quote.get_polars_schema(),
+                        schema=schema,
                     )
                 )
 
@@ -533,7 +539,9 @@ class Nivesh:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         format: Union[ReturnFormat, str] = ReturnFormat.DICT,
-    ) -> Union[dict[str, list], pl.DataFrame, pl.LazyFrame, pd.DataFrame, str]:
+        ohlc: bool = True,
+        resample: Optional[Union[timedelta, str]] = None,
+    ) -> NiveshPyOutputType:
         """Get the quotes for the specified tickers.
 
         Args:
@@ -552,8 +560,14 @@ class Nivesh:
             format (ReturnFormat): The format of the returned tickers.
                 Defaults to ReturnFormat.DICT. See [niveshpy.models.helpers.ReturnFormat] for available formats.
 
+            ohlc (bool): If True, return OHLC data. If False, return single quotes.
+
+            resample (Optional[Union[timedelta, str]]): The resampling period.
+                If specified, the quotes will be resampled to the specified period.
+                This can be a polars-compatible string (e.g. "1d", "1w", "1mo") or a timedelta object.
+
         Returns:
-            Union[Iterable[pl.DataFrame], pl.DataFrame, pd.DataFrame]: The quotes in the specified format.
+            NiveshPyOutputType: The quotes in the specified format.
 
         Raises:
             ValueError: If the end date is before the start date.
@@ -562,6 +576,8 @@ class Nivesh:
             >>> nivesh = Nivesh()
             >>> quotes = nivesh.get_quotes("500209", "500210", ("500211", "amfi"))
         """
+        schema = OHLC.get_polars_schema() if ohlc else Quote.get_polars_schema()
+
         if start_date and end_date and start_date > end_date:
             raise ValueError("Start date must be before end date")
 
@@ -578,7 +594,7 @@ class Nivesh:
             df_requested_tickers = self.get_tickers(format=ReturnFormat.PL_DATAFRAME)
         elif df_requested_tickers.height == 0:
             logger.warning("No tickers found matching the requested symbols.")
-            return format_output(Quote.get_polars_schema().to_frame(), format)
+            return format_output(schema.to_frame(), format)
 
         sources = self._get_sources(
             source_keys=df_requested_tickers.select("source_key")
@@ -587,22 +603,85 @@ class Nivesh:
             .to_list()
         )
 
-        return format_output(
-            pl.concat(
-                [
-                    self._get_quotes(
-                        df_requested_tickers.filter(
-                            pl.col("source_key") == pl.lit(source.get_source_key())
-                        )
-                        .select("symbol")
-                        .to_series()
-                        .to_list(),
-                        source,
-                        start_date,
-                        end_date,
-                    )
-                    for source in sources
-                ],
-            ),
-            format,
-        )
+        quotes = [
+            schema.to_frame(eager=True).with_columns(
+                pl.lit(None).cast(pl.String()).alias("source_key")
+            )
+        ]
+
+        for source in sources:
+            q = self._get_quotes(
+                df_requested_tickers.filter(
+                    pl.col("source_key") == pl.lit(source.get_source_key())
+                )
+                .select("symbol")
+                .to_series()
+                .to_list(),
+                source,
+                start_date,
+                end_date,
+            )
+
+            if (
+                ohlc
+                and SourceStrategy.SINGLE_QUOTE
+                in source.get_source_config().source_strategy
+            ):
+                # If the source returns a single quote, we need to convert it to OHLC
+                # by duplicating the quote for open, high, low, and close
+                q = q.select(
+                    pl.col("symbol").alias("symbol"),
+                    pl.col("date").alias("date"),
+                    pl.col("price").alias("open"),
+                    pl.col("price").alias("high"),
+                    pl.col("price").alias("low"),
+                    pl.col("price").alias("close"),
+                    pl.lit(source.get_source_key()).alias("source_key"),
+                )
+            elif (
+                not ohlc
+                and SourceStrategy.SINGLE_QUOTE
+                not in source.get_source_config().source_strategy
+            ):
+                # If the source returns OHLC data, we need to convert it to a single quote
+                # by taking only the close price
+                q = q.select(
+                    pl.col("symbol").alias("symbol"),
+                    pl.col("date").alias("date"),
+                    pl.col("close").alias("price"),
+                    pl.lit(source.get_source_key()).alias("source_key"),
+                )
+
+            quotes.append(q)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Quotes from source {source.get_source_key()}:")
+                logger.debug(q)
+
+        df_final_quotes = pl.concat(quotes)
+
+        if resample:
+            if ohlc:
+                df_final_quotes = df_final_quotes.group_by_dynamic(
+                    "date",
+                    every=resample,
+                    group_by=["symbol", "source_key"],
+                ).agg(
+                    pl.col("open").first().alias("open"),
+                    pl.col("high").max().alias("high"),
+                    pl.col("low").min().alias("low"),
+                    pl.col("close").last().alias("close"),
+                )
+            else:
+                df_final_quotes = df_final_quotes.group_by_dynamic(
+                    "date",
+                    every=resample,
+                    group_by=["symbol", "source_key"],
+                ).agg(
+                    pl.col("price")
+                    .cast(pl.Float32())
+                    .mean()
+                    .cast(pl.Decimal(scale=4))
+                    .alias("price"),
+                )
+
+        return format_output(df_final_quotes, format)
