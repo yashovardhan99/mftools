@@ -1,6 +1,7 @@
 """Mutual Fund utilities for Python."""
 
 from collections import defaultdict
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 import logging
 import importlib
@@ -10,7 +11,7 @@ import warnings
 from niveshpy.models.helpers import ReturnFormat
 from niveshpy.models.sources import Source
 from niveshpy.models.base import OHLC, Quote, SourceInfo, SourceStrategy, Ticker
-from niveshpy.models.types import NiveshPyOutputType
+from niveshpy.models.types import NiveshPyOutputType, QuotesIterable
 import niveshpy.plugins as _local_plugins
 from niveshpy.models.plugins import Plugin
 from niveshpy.utils import (
@@ -328,8 +329,11 @@ class Nivesh:
         end_date: Optional[date] = None,
     ):
         """Helper function to get quotes from a single source."""
+        source_strategy = source.get_source_config().source_strategy
+        source_key = source.get_source_key()
+
         # Get locally saved quotes
-        df_quotes = load_quotes(source.get_source_key())
+        df_quotes = load_quotes(source_key)
 
         actual_start_date = (
             start_date
@@ -348,7 +352,7 @@ class Nivesh:
 
         group_period = source.get_source_config().data_group_period
 
-        if SourceStrategy.ALL_TICKERS not in source.get_source_config().source_strategy:
+        if SourceStrategy.ALL_TICKERS not in source_strategy:
             df_available = df_quotes.filter(pl.col("symbol").is_in(symbols))
             df_date_range = df_date_range.join(
                 pl.LazyFrame(
@@ -378,7 +382,7 @@ class Nivesh:
         else:
             df_available = (
                 check_quotes_availability(
-                    source.get_source_key(), actual_start_date, actual_end_date
+                    source_key, actual_start_date, actual_end_date
                 )
                 .to_frame("date")
                 .lazy()
@@ -410,83 +414,108 @@ class Nivesh:
 
         schema = (
             Quote.get_polars_schema()
-            if SourceStrategy.SINGLE_QUOTE in source.get_source_config().source_strategy
+            if SourceStrategy.SINGLE_QUOTE in source_strategy
             else OHLC.get_polars_schema()
         )
         # Get unavailable quotes from the source
         new_quotes = [schema.to_frame(eager=False)]
 
-        for row in df_missing.collect().iter_rows(named=True):
-            start = row.get("start_date", row.get("date"))
-            end = row.get("end_date", row.get("date"))
+        data_refresh_threshold = (
+            date.today() - source.get_source_config().data_refresh_interval
+        )
 
-            logger.debug(
-                f"Getting quotes from {start} to {end} from source {source.get_source_key()}"
-            )
-            if SourceStrategy.ALL_TICKERS in source.get_source_config().source_strategy:
-                # CASE 1: ALL_TICKERS
+        with ThreadPoolExecutor() as executor:
+            futures: list[tuple[Future[QuotesIterable], date, date]] = []
 
-                if (
-                    start
-                    > date.today() - source.get_source_config().data_refresh_interval
-                ):
-                    logger.debug(
-                        f"Skipping source {source.get_source_key()} for {start} to {end} as it is beyond the refresh interval"
+            for row in df_missing.collect().iter_rows(named=True):
+                start = row.get("start_date", row.get("date"))
+                end = row.get("end_date", row.get("date"))
+
+                if SourceStrategy.ALL_TICKERS in source_strategy:
+                    # CASE 1: ALL_TICKERS
+                    if start > data_refresh_threshold:
+                        logger.debug(
+                            f"Skipping source {source_key} for {start} to {end} as it is beyond the refresh interval"
+                        )
+                        continue
+
+                    f = executor.submit(
+                        source.get_quotes,
+                        start_date=start,
+                        end_date=end,
                     )
-                    continue
-                new_quotes.append(
-                    handle_input(
-                        source.get_quotes(start_date=start, end_date=end),
-                        schema=schema,
+
+                    futures.append((f, start, end))
+
+                else:
+                    # CASE 2: DEFAULT
+                    f = executor.submit(
+                        source.get_quotes,
+                        *symbols,
+                        start_date=start,
+                        end_date=end,
                     )
-                )
-                mark_quotes_as_available(
-                    source.get_source_key(),
-                    min(
-                        start,
-                        date.today() - source.get_source_config().data_refresh_interval,
-                    ),
-                    min(
-                        end,
-                        date.today() - source.get_source_config().data_refresh_interval,
-                    ),
-                )
-            else:
-                # CASE 2: DEFAULT
-                new_quotes.append(
-                    handle_input(
-                        source.get_quotes(
-                            *symbols,
+
+                    futures.append((f, start, end))
+
+            for future, start, end in futures:
+                logger.debug(f"Received quotes from {source_key} for {start} to {end}")
+                try:
+                    new_quotes.append(handle_input(future.result(), schema=schema))
+
+                    if SourceStrategy.ALL_TICKERS in source_strategy:
+                        # Mark the quotes as available
+                        mark_quotes_as_available(
+                            source_key,
                             start_date=start,
                             end_date=end,
-                        ),
-                        schema=schema,
-                    )
-                )
+                        )
+                except Exception:
+                    logger.exception(f"Error getting quotes from {source_key}")
 
-        df_new = pl.concat(new_quotes, how="vertical_relaxed").select(
-            pl.col("symbol").cast(pl.String()),
-            pl.col("date").cast(pl.Date()),
-            pl.col("price").cast(pl.Decimal(scale=4)),
-        )
-
-        # Update the quotes with the new data
-        df_quotes_collected = (
-            df_quotes.update(df_new, on=["symbol", "date"], how="full")
-            .sort("date")
+        df_new = (
+            pl.concat(new_quotes, how="vertical_relaxed")
+            .select(
+                pl.col("symbol").cast(pl.String()),
+                pl.col("date").cast(pl.Date()),
+                pl.col("price").cast(pl.Decimal(scale=4)),
+            )
             .collect()
         )
-        # Save the quotes to a local file
-        save_quotes(df_quotes_collected, source.get_source_key())
-        return df_quotes_collected.filter(
+
+        if df_new.height > 0:
+            # Update the quotes with the new data
+            df_quotes_collected = df_quotes.collect()
+            df_quotes_collected = df_quotes_collected.update(
+                df_new, on=["symbol", "date"], how="full"
+            ).sort("date")
+            # Save the quotes to a local file
+            save_quotes(df_quotes_collected, source_key)
+
+            df_quotes = df_quotes_collected.lazy()
+
+        df_quotes = df_quotes.filter(
             pl.col("symbol").is_in(symbols)
             & pl.col("date").is_between(actual_start_date, actual_end_date)
-        ).select(
-            pl.col("symbol").cast(pl.String()),
-            pl.col("date").cast(pl.Date()),
-            pl.col("price").cast(pl.Decimal(scale=4)),
-            pl.lit(source.get_source_key()).alias("source_key"),
         )
+
+        if SourceStrategy.SINGLE_QUOTE in source_strategy:
+            return df_quotes.select(
+                pl.col("symbol").cast(pl.String()),
+                pl.col("date").cast(pl.Date()),
+                pl.col("price").cast(pl.Decimal(scale=4)),
+                pl.lit(source_key).alias("source_key"),
+            ).collect()
+        else:
+            return df_quotes.select(
+                pl.col("symbol").cast(pl.String()),
+                pl.col("date").cast(pl.Date()),
+                pl.col("open").cast(pl.Decimal(scale=4)),
+                pl.col("high").cast(pl.Decimal(scale=4)),
+                pl.col("low").cast(pl.Decimal(scale=4)),
+                pl.col("close").cast(pl.Decimal(scale=4)),
+                pl.lit(source_key).alias("source_key"),
+            ).collect()
 
     @overload
     def get_quotes(
@@ -594,7 +623,12 @@ class Nivesh:
             df_requested_tickers = self.get_tickers(format=ReturnFormat.PL_DATAFRAME)
         elif df_requested_tickers.height == 0:
             logger.warning("No tickers found matching the requested symbols.")
-            return format_output(schema.to_frame(), format)
+            return format_output(
+                schema.to_frame().with_columns(
+                    source_key=pl.lit(None).cast(pl.String())
+                ),
+                format,
+            )
 
         sources = self._get_sources(
             source_keys=df_requested_tickers.select("source_key")
@@ -609,53 +643,66 @@ class Nivesh:
             )
         ]
 
-        for source in sources:
-            q = self._get_quotes(
-                df_requested_tickers.filter(
-                    pl.col("source_key") == pl.lit(source.get_source_key())
-                )
-                .select("symbol")
-                .to_series()
-                .to_list(),
-                source,
-                start_date,
-                end_date,
-            )
+        with ThreadPoolExecutor() as executor:
+            futures = {
+                executor.submit(
+                    self._get_quotes,
+                    df_requested_tickers.filter(
+                        pl.col("source_key") == pl.lit(source.get_source_key())
+                    )
+                    .select("symbol")
+                    .to_series()
+                    .to_list(),
+                    source,
+                    start_date,
+                    end_date,
+                ): source
+                for source in sources
+            }
 
-            if (
-                ohlc
-                and SourceStrategy.SINGLE_QUOTE
-                in source.get_source_config().source_strategy
-            ):
-                # If the source returns a single quote, we need to convert it to OHLC
-                # by duplicating the quote for open, high, low, and close
-                q = q.select(
-                    pl.col("symbol").alias("symbol"),
-                    pl.col("date").alias("date"),
-                    pl.col("price").alias("open"),
-                    pl.col("price").alias("high"),
-                    pl.col("price").alias("low"),
-                    pl.col("price").alias("close"),
-                    pl.lit(source.get_source_key()).alias("source_key"),
-                )
-            elif (
-                not ohlc
-                and SourceStrategy.SINGLE_QUOTE
-                not in source.get_source_config().source_strategy
-            ):
-                # If the source returns OHLC data, we need to convert it to a single quote
-                # by taking only the close price
-                q = q.select(
-                    pl.col("symbol").alias("symbol"),
-                    pl.col("date").alias("date"),
-                    pl.col("close").alias("price"),
-                    pl.lit(source.get_source_key()).alias("source_key"),
-                )
+            for future in futures:
+                source = futures[future]
+                try:
+                    q = future.result()
+                except Exception:
+                    logger.exception(
+                        f"Error getting quotes from {source.get_source_key()}"
+                    )
+                else:
+                    if (
+                        ohlc
+                        and SourceStrategy.SINGLE_QUOTE
+                        in source.get_source_config().source_strategy
+                    ):
+                        # If the source returns a single quote, we need to convert it to OHLC
+                        # by duplicating the quote for open, high, low, and close
+                        q = q.select(
+                            pl.col("symbol").alias("symbol"),
+                            pl.col("date").alias("date"),
+                            pl.col("price").alias("open"),
+                            pl.col("price").alias("high"),
+                            pl.col("price").alias("low"),
+                            pl.col("price").alias("close"),
+                            pl.lit(source.get_source_key()).alias("source_key"),
+                        )
+                    elif (
+                        not ohlc
+                        and SourceStrategy.SINGLE_QUOTE
+                        not in source.get_source_config().source_strategy
+                    ):
+                        # If the source returns OHLC data, we need to convert it to a single quote
+                        # by taking only the close price
+                        q = q.select(
+                            pl.col("symbol").alias("symbol"),
+                            pl.col("date").alias("date"),
+                            pl.col("close").alias("price"),
+                            pl.lit(source.get_source_key()).alias("source_key"),
+                        )
 
-            quotes.append(q)
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"Quotes from source {source.get_source_key()}:")
-                logger.debug(q)
+                    quotes.append(q)
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(f"Quotes from source {source.get_source_key()}:")
+                        logger.debug(q)
 
         df_final_quotes = pl.concat(quotes)
 

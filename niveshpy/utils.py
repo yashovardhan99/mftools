@@ -2,6 +2,7 @@
 
 from datetime import date
 import logging
+from multiprocessing import Lock
 from pathlib import Path
 import pandas as pd
 import platformdirs
@@ -125,6 +126,8 @@ _availability_schema = pl.Schema(
     }
 )
 
+_availability_lock = Lock()
+
 
 def mark_quotes_as_available(
     source_key: str,
@@ -143,23 +146,25 @@ def mark_quotes_as_available(
     if not file_path.parent.exists():
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if file_path.exists():
-        df_availability = pl.read_parquet(file_path)
-    else:
-        df_availability = _availability_schema.to_frame(eager=True)
+    # Use a lock to ensure thread safety when writing to the file
+    with _availability_lock:
+        if file_path.exists():
+            df_availability = pl.read_parquet(file_path)
+        else:
+            df_availability = _availability_schema.to_frame(eager=True)
 
-    df_new_availability = (
-        pl.date_range(start=start_date, end=end_date, interval="1d", eager=True)
-        .to_frame("date")
-        .with_columns(pl.lit(source_key).alias("source_key"))
-    )
+        df_new_availability = (
+            pl.date_range(start=start_date, end=end_date, interval="1d", eager=True)
+            .to_frame("date")
+            .with_columns(pl.lit(source_key).alias("source_key"))
+        )
 
-    df_availability = df_availability.update(
-        df_new_availability,
-        on=["source_key", "date"],
-        how="full",
-    )
-    df_availability.write_parquet(file_path)
+        df_availability = df_availability.update(
+            df_new_availability,
+            on=["source_key", "date"],
+            how="full",
+        )
+        df_availability.write_parquet(file_path)
 
 
 def check_quotes_availability(
