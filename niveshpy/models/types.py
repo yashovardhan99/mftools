@@ -17,14 +17,13 @@ from niveshpy.models.base import OHLC, Quote, SourceConfig, SourceInfo, Ticker
 
 # Type Aliases
 PolarsFrameType = Union[pl.DataFrame, pl.LazyFrame]
-Frame = Union[PolarsFrameType, pd.DataFrame]
 
 NiveshPyType = Union[Ticker, Quote, OHLC, SourceInfo, SourceConfig]
 
-QuotesIterable = Union[Iterable[Quote], Iterable[OHLC], Frame]
-TickersIterable = Union[Iterable[Ticker], Frame]
+QuotesIterable = Union[Iterable[Quote], Iterable[OHLC], PolarsFrameType]
+TickersIterable = Union[Iterable[Ticker], PolarsFrameType]
 
-NiveshPyIterable = Union[Frame, Iterable[NiveshPyType]]
+NiveshPyIterable = Union[PolarsFrameType, Iterable[NiveshPyType]]
 
 NiveshPyOutputType = Union[
     dict[str, list], pl.DataFrame, pl.LazyFrame, pd.DataFrame, str

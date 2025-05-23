@@ -226,10 +226,9 @@ class Nivesh:
             # This will run for all sources matching the source_keys (if applicable)
             key = source.get_source_key()
             refresh_interval = source.get_source_config().ticker_refresh_interval
-            if (
-                key in pre_loaded_sources
-                and refresh_interval is not None
-                and (datetime.now() - pre_loaded_sources[key]) < refresh_interval
+            if key in pre_loaded_sources and (
+                refresh_interval is None
+                or (datetime.now() - pre_loaded_sources[key]) < refresh_interval
             ):
                 logger.debug(f"Skipping source {key} as it is up to date")
             else:
@@ -257,6 +256,7 @@ class Nivesh:
         )
 
         logger.debug("Saving all tickers to local file")
+        df_tickers = df_tickers.collect()
         save_tickers(df_tickers)
 
         logger.debug("Applying filters to tickers")
@@ -335,9 +335,14 @@ class Nivesh:
         """Helper function to get quotes from a single source."""
         source_strategy = source.get_source_config().source_strategy
         source_key = source.get_source_key()
+        schema = (
+            Quote.get_polars_schema()
+            if SourceStrategy.SINGLE_QUOTE in source_strategy
+            else OHLC.get_polars_schema()
+        )
 
         # Get locally saved quotes
-        df_quotes = load_quotes(source_key)
+        df_quotes = load_quotes(source_key, schema)
 
         actual_start_date = (
             start_date
@@ -416,11 +421,6 @@ class Nivesh:
                     pl.col("date").last().alias("end_date"),
                 )
 
-        schema = (
-            Quote.get_polars_schema()
-            if SourceStrategy.SINGLE_QUOTE in source_strategy
-            else OHLC.get_polars_schema()
-        )
         # Get unavailable quotes from the source
         new_quotes = [schema.to_frame(eager=False)]
 
@@ -477,15 +477,29 @@ class Nivesh:
                 except Exception:
                     logger.exception(f"Error getting quotes from {source_key}")
 
-        df_new = (
-            pl.concat(new_quotes, how="vertical_relaxed")
-            .select(
-                pl.col("symbol").cast(pl.String()),
-                pl.col("date").cast(pl.Date()),
-                pl.col("price").cast(pl.Decimal(scale=4)),
+        if SourceStrategy.SINGLE_QUOTE in source_strategy:
+            df_new = (
+                pl.concat(new_quotes, how="vertical_relaxed")
+                .select(
+                    pl.col("symbol").cast(pl.String()),
+                    pl.col("date").cast(pl.Date()),
+                    pl.col("price").cast(pl.Decimal(scale=4)),
+                )
+                .collect()
             )
-            .collect()
-        )
+        else:
+            df_new = (
+                pl.concat(new_quotes, how="vertical_relaxed")
+                .select(
+                    pl.col("symbol").cast(pl.String()),
+                    pl.col("date").cast(pl.Date()),
+                    pl.col("open").cast(pl.Decimal(scale=4)),
+                    pl.col("high").cast(pl.Decimal(scale=4)),
+                    pl.col("low").cast(pl.Decimal(scale=4)),
+                    pl.col("close").cast(pl.Decimal(scale=4)),
+                )
+                .collect()
+            )
 
         if df_new.height > 0:
             # Update the quotes with the new data

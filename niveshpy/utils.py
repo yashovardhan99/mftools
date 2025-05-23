@@ -12,13 +12,10 @@ import platformdirs
 import polars as pl
 
 from niveshpy.models import (
-    Quote,
     ReturnFormat,
 )
 
 if TYPE_CHECKING:
-    import pandas as pd
-
     from niveshpy.models.types import (
         NiveshPyIterable,
         NiveshPyOutputType,
@@ -47,8 +44,6 @@ def handle_input(
     """Handle input data and convert it to a Polars LazyFrame."""
     if isinstance(data, (pl.DataFrame, pl.LazyFrame)):
         return data.lazy()
-    elif isinstance(data, pd.DataFrame):
-        return pl.from_pandas(data, schema_overrides=schema).lazy()
     else:
         return pl.from_dicts(map(lambda x: x._asdict(), data), schema=schema).lazy()
 
@@ -206,10 +201,10 @@ def save_quotes(quotes: pl.DataFrame, source_key: str) -> None:
     quotes.write_parquet(file_path)
 
 
-def load_quotes(source_key: str) -> pl.LazyFrame:
+def load_quotes(source_key: str, schema: pl.Schema) -> pl.LazyFrame:
     """Load quotes from a parquet file."""
     file_path = get_quotes_dir().joinpath(f"quotes_{source_key}.parquet")
     if not file_path.exists():
         logger.info(f"File {file_path} does not exist.")
-        return Quote.get_polars_schema().to_frame(eager=False)
-    return pl.scan_parquet(file_path)
+        return schema.to_frame(eager=False)
+    return pl.scan_parquet(file_path, schema=schema)
