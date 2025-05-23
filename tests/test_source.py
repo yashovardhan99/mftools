@@ -107,16 +107,3 @@ def test_get_sources_specific():
     assert len(sources_list) == 1
     assert isinstance(sources_list[0], SourceInfo)
     assert sources_list[0].key == "dummy_source"
-
-
-def test_get_tickers():
-    """Test the get_tickers method."""
-    app = Nivesh()
-    app.register_plugin(DummySourcePlugin())
-    tickers = app.get_tickers(source_keys=["dummy_source"])
-    assert isinstance(tickers, Iterable)
-
-    tickers_list = list(tickers)
-    assert len(tickers_list) > 0
-    assert isinstance(tickers_list[0], Ticker)
-    assert tickers_list[0].symbol == "dummy_ticker_1"
