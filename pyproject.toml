@@ -8,12 +8,9 @@ description = "A simple python library for all your investment needs."
 version = "0.1.0"
 dependencies = [
     "polars >= 1.29.0, < 2.0.0",
-    "requests >= 2.32.0, < 3.0.0",
     "scipy >= 1.13.1, < 2.0.0",
     "numpy >= 2.0.2, < 3.0.0",
     "platformdirs >= 4.3.8, < 5.0.0",
-    "pandas >= 2.2.2, < 3.0.0",
-    "pyarrow >= 20.0.0, < 21.0.0",
 ]
 requires-python = ">=3.9"
 authors = [
@@ -34,6 +31,10 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 
+[project.optional-dependencies]
+pandas = ["pandas >= 2.2.2, < 3.0.0", "pyarrow >= 20.0.0, < 21.0.0"]
+all = ["niveshpy[pandas]"]
+
 [project.urls]
 Homepage = "http://github.com/yashovardhan99/niveshpy"
 # Documentation = "https://readthedocs.org"
@@ -46,7 +47,7 @@ releasenotes = "https://github.com/yashovardhan99/niveshpy/releases"
 [dependency-groups]
 testing = ["pytest >= 8.3.5, < 9.0.0", "coverage[toml] >= 7.8.0, < 8.0.0"]
 linting = ["ruff >= 0.11.9, < 0.12.0", "mypy >= 1.15.0, < 2.0.0"]
-stubs = ["pandas-stubs >= 2.2.2, < 3.0.0", "types-requests >= 2.32.0, < 3.0.0"]
+stubs = ["pandas-stubs >= 2.2.2, < 3.0.0"]
 dev = [
     { include-group = "testing" },
     { include-group = "linting" },
@@ -76,7 +77,7 @@ docstring-code-format = true
 exclude_also = [
     # Don't complain about missing debug-only code:
     "def __repr__",
-    "if self\\.debug",
+    "if logger\\.isEnabledFor\\(logging\\.DEBUG\\)",
 
     # Don't complain if tests don't hit defensive assertion code:
     "raise AssertionError",
@@ -88,4 +89,7 @@ exclude_also = [
 
     # Don't complain about abstract methods, they aren't run:
     "@(abc\\.)?abstractmethod",
+
+    # Don't complaint about type-checking code, it isn't run:
+    "if TYPE_CHECKING",
 ]

@@ -1,20 +1,28 @@
 """Utility functions for niveshpy."""
 
-from datetime import date
+from __future__ import annotations
+
 import logging
+from datetime import date
+from multiprocessing import Lock
 from pathlib import Path
-import pandas as pd
+from typing import TYPE_CHECKING
+
 import platformdirs
-from typing import Any, Optional, Union
 import polars as pl
 
-from niveshpy.models.base import Quote
-from niveshpy.models.helpers import ReturnFormat
-from niveshpy.models.types import (
-    NiveshPyIterable,
-    PolarsFrameType,
-    PolarsFrame,
+from niveshpy.models import (
+    ReturnFormat,
 )
+
+if TYPE_CHECKING:
+    from niveshpy.models.types import (
+        NiveshPyIterable,
+        NiveshPyOutputType,
+        PolarsFrame,
+        PolarsFrameType,
+    )
+
 
 logger = logging.getLogger(__name__)
 
@@ -31,21 +39,19 @@ def get_quotes_dir() -> Path:
 
 def handle_input(
     data: NiveshPyIterable,
-    schema: Optional[pl.Schema] = None,
+    schema: pl.Schema | None = None,
 ) -> pl.LazyFrame:
     """Handle input data and convert it to a Polars LazyFrame."""
     if isinstance(data, (pl.DataFrame, pl.LazyFrame)):
         return data.lazy()
-    elif isinstance(data, pd.DataFrame):
-        return pl.from_pandas(data, schema_overrides=schema).lazy()
     else:
         return pl.from_dicts(map(lambda x: x._asdict(), data), schema=schema).lazy()
 
 
 def format_output(
     data: PolarsFrameType,
-    format: Union[ReturnFormat, str],
-) -> Union[dict[str, list[Any]], pl.DataFrame, pl.LazyFrame, pd.DataFrame, str]:
+    format: ReturnFormat | str,
+) -> NiveshPyOutputType:
     """Format the output based on the specified format."""
     data = data.lazy()
     if isinstance(format, str):
@@ -69,9 +75,9 @@ def format_output(
 
 def apply_filters(
     frame: PolarsFrame,
-    source_keys: Optional[list[str]],
-    filters: Optional[dict[str, list[str]]],
-    schema: Optional[pl.Schema] = None,
+    source_keys: list[str] | None,
+    filters: dict[str, list[str]] | None,
+    schema: pl.Schema | None = None,
 ) -> PolarsFrame:
     """Filter records based on source keys and other filters.
 
@@ -125,6 +131,8 @@ _availability_schema = pl.Schema(
     }
 )
 
+_availability_lock = Lock()
+
 
 def mark_quotes_as_available(
     source_key: str,
@@ -143,23 +151,25 @@ def mark_quotes_as_available(
     if not file_path.parent.exists():
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if file_path.exists():
-        df_availability = pl.read_parquet(file_path)
-    else:
-        df_availability = _availability_schema.to_frame(eager=True)
+    # Use a lock to ensure thread safety when writing to the file
+    with _availability_lock:
+        if file_path.exists():
+            df_availability = pl.read_parquet(file_path)
+        else:
+            df_availability = _availability_schema.to_frame(eager=True)
 
-    df_new_availability = (
-        pl.date_range(start=start_date, end=end_date, interval="1d", eager=True)
-        .to_frame("date")
-        .with_columns(pl.lit(source_key).alias("source_key"))
-    )
+        df_new_availability = (
+            pl.date_range(start=start_date, end=end_date, interval="1d", eager=True)
+            .to_frame("date")
+            .with_columns(pl.lit(source_key).alias("source_key"))
+        )
 
-    df_availability = df_availability.update(
-        df_new_availability,
-        on=["source_key", "date"],
-        how="full",
-    )
-    df_availability.write_parquet(file_path)
+        df_availability = df_availability.update(
+            df_new_availability,
+            on=["source_key", "date"],
+            how="full",
+        )
+        df_availability.write_parquet(file_path)
 
 
 def check_quotes_availability(
@@ -191,10 +201,10 @@ def save_quotes(quotes: pl.DataFrame, source_key: str) -> None:
     quotes.write_parquet(file_path)
 
 
-def load_quotes(source_key: str) -> pl.LazyFrame:
+def load_quotes(source_key: str, schema: pl.Schema) -> pl.LazyFrame:
     """Load quotes from a parquet file."""
     file_path = get_quotes_dir().joinpath(f"quotes_{source_key}.parquet")
     if not file_path.exists():
         logger.info(f"File {file_path} does not exist.")
-        return Quote.get_polars_schema().to_frame(eager=False)
-    return pl.scan_parquet(file_path)
+        return schema.to_frame(eager=False)
+    return pl.scan_parquet(file_path, schema=schema)
