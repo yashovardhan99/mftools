@@ -1,10 +1,17 @@
-"""Type aliases for NiveshPy models."""
+"""Type aliases for NiveshPy models.
 
-from typing import TypeVar, Union
+This module is designed to work with static type checkers and as such
+imports optional depedencies like pandas. Avoid importing this module
+directly, instead import this module inside a `if TYPE_CHECKING` block.
+"""
+
+from __future__ import annotations
+
 from collections.abc import Iterable
+from typing import TypeVar, Union
 
-import polars as pl
 import pandas as pd
+import polars as pl
 
 from niveshpy.models.base import OHLC, Quote, SourceConfig, SourceInfo, Ticker
 

@@ -1,5 +1,7 @@
 """Mutual Fund utilities for Python."""
 
+from __future__ import annotations
+
 from collections import defaultdict
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import date, datetime, timedelta
@@ -11,7 +13,6 @@ import warnings
 from niveshpy.models.helpers import ReturnFormat
 from niveshpy.models.sources import Source
 from niveshpy.models.base import OHLC, Quote, SourceInfo, SourceStrategy, Ticker
-from niveshpy.models.types import NiveshPyOutputType, QuotesIterable
 import niveshpy.plugins as _local_plugins
 from niveshpy.models.plugins import Plugin
 from niveshpy.utils import (
@@ -26,16 +27,21 @@ from niveshpy.utils import (
     save_tickers,
 )
 
-from typing import Literal, Optional, Union, overload
+from typing import TYPE_CHECKING, Literal, overload
 from collections.abc import Collection
 from collections.abc import Iterable
-import pandas as pd
+
 import polars as pl
+
+
+if TYPE_CHECKING:
+    import pandas as pd
+    from niveshpy.models.types import NiveshPyOutputType, QuotesIterable
 
 logger = logging.getLogger(__name__)
 
 
-def _import_plugin(name: str) -> Optional[Plugin]:
+def _import_plugin(name: str) -> Plugin | None:
     """Import a plugin by name."""
     try:
         module = importlib.import_module(name)
@@ -88,7 +94,7 @@ class Nivesh:
         else:
             raise TypeError("Plugin must be an instance of Plugin class")
 
-    def _get_sources(self, source_keys: Optional[list[str]] = None) -> Iterable[Source]:
+    def _get_sources(self, source_keys: list[str] | None = None) -> Iterable[Source]:
         """Get the list of sources from all plugins."""
         logger.debug("Getting sources from all plugins")
         for plugin in self.plugins:
@@ -97,13 +103,11 @@ class Nivesh:
                     yield source
                     logger.debug(f"Loaded source: {source.get_source_info()}")
 
-    def get_sources(
-        self, source_keys: Optional[list[str]] = None
-    ) -> Iterable[SourceInfo]:
+    def get_sources(self, source_keys: list[str] | None = None) -> Iterable[SourceInfo]:
         """Get the list of sources from all plugins.
 
         Args:
-            source_keys (Optional[List[str]]): The source keys to filter by.
+            source_keys (List[str] | None): The source keys to filter by.
                 Defaults to None.
                 The source key is the key used to identify the source of the tickers.
                 If source_keys is specified, only the sources from the specified keys
@@ -122,57 +126,57 @@ class Nivesh:
     @overload
     def get_tickers(
         self,
-        filters: Optional[dict[str, list[str]]] = None,
-        source_keys: Optional[list[str]] = None,
+        filters: dict[str, list[str]] | None = None,
+        source_keys: list[str] | None = None,
         format: Literal[ReturnFormat.DICT] = ...,
     ) -> dict[str, list]: ...
 
     @overload
     def get_tickers(
         self,
-        filters: Optional[dict[str, list[str]]] = None,
-        source_keys: Optional[list[str]] = None,
+        filters: dict[str, list[str]] | None = None,
+        source_keys: list[str] | None = None,
         format: Literal[ReturnFormat.PL_DATAFRAME] = ...,
     ) -> pl.DataFrame: ...
 
     @overload
     def get_tickers(
         self,
-        filters: Optional[dict[str, list[str]]] = None,
-        source_keys: Optional[list[str]] = None,
+        filters: dict[str, list[str]] | None = None,
+        source_keys: list[str] | None = None,
         format: Literal[ReturnFormat.PL_LAZYFRAME] = ...,
     ) -> pl.LazyFrame: ...
 
     @overload
     def get_tickers(
         self,
-        filters: Optional[dict[str, list[str]]] = None,
-        source_keys: Optional[list[str]] = None,
+        filters: dict[str, list[str]] | None = None,
+        source_keys: list[str] | None = None,
         format: Literal[ReturnFormat.PD_DATAFRAME] = ...,
     ) -> pd.DataFrame: ...
 
     @overload
     def get_tickers(
         self,
-        filters: Optional[dict[str, list[str]]] = None,
-        source_keys: Optional[list[str]] = None,
+        filters: dict[str, list[str]] | None = None,
+        source_keys: list[str] | None = None,
         format: Literal[ReturnFormat.JSON, ReturnFormat.CSV] = ...,
     ) -> str: ...
 
     def get_tickers(
         self,
-        filters: Optional[dict[str, list[str]]] = None,
-        source_keys: Optional[list[str]] = None,
-        format: Union[ReturnFormat, str] = ReturnFormat.DICT,
+        filters: dict[str, list[str]] | None = None,
+        source_keys: list[str] | None = None,
+        format: ReturnFormat | str = ReturnFormat.DICT,
     ) -> NiveshPyOutputType:
         """Get the list of tickers from all plugins.
 
         Args:
-            filters (Optional[Dict[str, List[str]]]): Filters to apply to the tickers.
+            filters (Dict[str, List[str]] | None): Filters to apply to the tickers.
                 Defaults to None.
                 See [niveshpy.utils.filter_tickers] for available filters.
 
-            source_keys (Optional[List[str]]): The source keys to filter by.
+            source_keys (List[str] | None): The source keys to filter by.
                 Defaults to None. If source_keys is specified, only the tickers
                 from the specified sources are returned.
                 If source_key is None, all tickers from all sources are returned.
@@ -259,9 +263,9 @@ class Nivesh:
         df_tickers = apply_filters(df_tickers, source_keys, filters)
         return format_output(df_tickers, format)
 
-    def _handle_tickers(self, *tickers: Union[str, tuple[str, str]]) -> pl.DataFrame:
+    def _handle_tickers(self, *tickers: str | tuple[str, str]) -> pl.DataFrame:
         """Handle the input tickers and return a DataFrame with the requested tickers."""
-        tickers_grouped: dict[Union[str, None], list[str]] = defaultdict(list)
+        tickers_grouped: dict[str | None, list[str]] = defaultdict(list)
         for ticker in tickers:
             if isinstance(ticker, str):
                 tickers_grouped[None].append(ticker)
@@ -325,8 +329,8 @@ class Nivesh:
         self,
         symbols: Collection[str],
         source: Source,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
     ):
         """Helper function to get quotes from a single source."""
         source_strategy = source.get_source_config().source_strategy
@@ -564,26 +568,26 @@ class Nivesh:
 
     def get_quotes(
         self,
-        *tickers: Union[str, tuple[str, str]],
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
-        format: Union[ReturnFormat, str] = ReturnFormat.DICT,
+        *tickers: str | tuple[str, str],
+        start_date: date | None = None,
+        end_date: date | None = None,
+        format: ReturnFormat | str = ReturnFormat.DICT,
         ohlc: bool = True,
-        resample: Optional[Union[timedelta, str]] = None,
+        resample: timedelta | str | None = None,
     ) -> NiveshPyOutputType:
         """Get the quotes for the specified tickers.
 
         Args:
-            tickers (Union[str, Tuple[str, str]]): The tickers to get quotes for.
+            tickers (str | Tuple[str, str]): The tickers to get quotes for.
 
                 This can be a single symbol, a list of symbols, or a list of tuples
                 containing the symbol and the source key.
                 If source key is not specified, the pre-existing tickers are checked first.
                 If not found, all out-dated sources are checked.
 
-            start_date (Optional[date]): The start date for the quotes (inclusive). If None, defaults to today.
+            start_date (date | None): The start date for the quotes (inclusive). If None, defaults to today.
 
-            end_date (Optional[date]): The end date for the quotes (inclusive). If None, defaults to today.
+            end_date (date | None): The end date for the quotes (inclusive). If None, defaults to today.
                 The end date must be greater than or equal to the start date.
 
             format (ReturnFormat): The format of the returned tickers.
@@ -591,7 +595,7 @@ class Nivesh:
 
             ohlc (bool): If True, return OHLC data. If False, return single quotes.
 
-            resample (Optional[Union[timedelta, str]]): The resampling period.
+            resample (timedelta | str | None): The resampling period.
                 If specified, the quotes will be resampled to the specified period.
                 This can be a polars-compatible string (e.g. "1d", "1w", "1mo") or a timedelta object.
 

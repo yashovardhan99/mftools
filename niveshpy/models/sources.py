@@ -1,12 +1,15 @@
 """Models for data sources."""
 
+from __future__ import annotations
+
 import abc
 from datetime import date
-from typing import Optional
+from typing import TYPE_CHECKING
 
-
-from niveshpy.models.types import QuotesIterable, TickersIterable
 from niveshpy.models.base import SourceInfo, SourceConfig
+
+if TYPE_CHECKING:
+    from niveshpy.models.types import QuotesIterable, TickersIterable
 
 
 class Source(abc.ABC):
@@ -20,8 +23,8 @@ class Source(abc.ABC):
     def get_quotes(
         self,
         *tickers: str,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
     ) -> QuotesIterable:
         """Get the quotes for the given tickers.
 

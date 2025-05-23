@@ -1,21 +1,31 @@
 """Utility functions for niveshpy."""
 
-from datetime import date
+from __future__ import annotations
+
 import logging
+from datetime import date
 from multiprocessing import Lock
 from pathlib import Path
-import pandas as pd
+from typing import TYPE_CHECKING
+
 import platformdirs
-from typing import Any, Optional, Union
 import polars as pl
 
-from niveshpy.models.base import Quote
-from niveshpy.models.helpers import ReturnFormat
-from niveshpy.models.types import (
-    NiveshPyIterable,
-    PolarsFrameType,
-    PolarsFrame,
+from niveshpy.models import (
+    Quote,
+    ReturnFormat,
 )
+
+if TYPE_CHECKING:
+    import pandas as pd
+
+    from niveshpy.models.types import (
+        NiveshPyIterable,
+        NiveshPyOutputType,
+        PolarsFrame,
+        PolarsFrameType,
+    )
+
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +42,7 @@ def get_quotes_dir() -> Path:
 
 def handle_input(
     data: NiveshPyIterable,
-    schema: Optional[pl.Schema] = None,
+    schema: pl.Schema | None = None,
 ) -> pl.LazyFrame:
     """Handle input data and convert it to a Polars LazyFrame."""
     if isinstance(data, (pl.DataFrame, pl.LazyFrame)):
@@ -45,8 +55,8 @@ def handle_input(
 
 def format_output(
     data: PolarsFrameType,
-    format: Union[ReturnFormat, str],
-) -> Union[dict[str, list[Any]], pl.DataFrame, pl.LazyFrame, pd.DataFrame, str]:
+    format: ReturnFormat | str,
+) -> NiveshPyOutputType:
     """Format the output based on the specified format."""
     data = data.lazy()
     if isinstance(format, str):
@@ -70,9 +80,9 @@ def format_output(
 
 def apply_filters(
     frame: PolarsFrame,
-    source_keys: Optional[list[str]],
-    filters: Optional[dict[str, list[str]]],
-    schema: Optional[pl.Schema] = None,
+    source_keys: list[str] | None,
+    filters: dict[str, list[str]] | None,
+    schema: pl.Schema | None = None,
 ) -> PolarsFrame:
     """Filter records based on source keys and other filters.
 

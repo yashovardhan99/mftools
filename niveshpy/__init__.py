@@ -1,6 +1,6 @@
 """Built-in plugins for NiveshPy."""
 
-from .main import Nivesh
+from niveshpy.main import Nivesh
 from importlib.metadata import version
 
 __all__ = ["Nivesh"]
