@@ -248,20 +248,24 @@ class Nivesh:
             pl.lit(datetime.now()).alias("last_updated"),
         )
 
-        logger.debug("Combining tickers with locally saved tickers")
-        df_tickers = df_tickers_pre.update(
-            df_tickers,
-            on=["source_key", "symbol"],
-            how="full",
-        )
+        df_tickers_collected = df_tickers.collect()
+        if df_tickers_collected.height > 0:
+            logger.debug("Combining tickers with locally saved tickers")
+            df_tickers_collected = df_tickers_pre.collect().update(
+                df_tickers_collected,
+                on=["source_key", "symbol"],
+                how="full",
+            )
 
-        logger.debug("Saving all tickers to local file")
-        df_tickers = df_tickers.collect()
-        save_tickers(df_tickers)
+            logger.debug("Saving all tickers to local file")
+            save_tickers(df_tickers_collected)
+        else:
+            logger.debug("No new tickers found")
+            df_tickers_collected = df_tickers_pre.collect()
 
         logger.debug("Applying filters to tickers")
-        df_tickers = apply_filters(df_tickers, source_keys, filters)
-        return format_output(df_tickers, format)
+        df_tickers_collected = apply_filters(df_tickers_collected, source_keys, filters)
+        return format_output(df_tickers_collected, format)
 
     def _handle_tickers(self, *tickers: str | tuple[str, str]) -> pl.DataFrame:
         """Handle the input tickers and return a DataFrame with the requested tickers."""
