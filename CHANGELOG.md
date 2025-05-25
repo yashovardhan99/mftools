@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Basic project structure
+- Basic project structure for Python package.
+- Ability to fetch and store latest and historical quotes.
+- Pre-built plugin: amfi (Mutual Fund)
+- Documentation
 
 [unreleased]: https://github.com/yashovardhan99/niveshpy/commits/main
