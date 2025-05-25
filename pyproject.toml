@@ -1,11 +1,11 @@
 [build-system]
-requires = ["hatchling >= 1.27.0, < 2.0.0"]
+requires = ["hatchling >= 1.27.0, < 2.0.0", "hatch-vcs == 0.4.*"]
 build-backend = "hatchling.build"
 
 [project]
 name = "NiveshPy"
 description = "A simple python library for all your investment needs."
-version = "0.1.0"
+dynamic = ["version"]
 dependencies = [
     "polars >= 1.29.0, < 2.0.0",
     "scipy >= 1.13.1, < 2.0.0",
@@ -99,3 +99,9 @@ exclude_also = [
     # Don't complaint about type-checking code, it isn't run:
     "if TYPE_CHECKING",
 ]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+version_scheme = "no-guess-dev"
