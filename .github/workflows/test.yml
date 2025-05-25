@@ -76,6 +76,7 @@ jobs:
       
       - name: Combine coverage data and generate report
         run: |
+          ls -l -R # List files for debugging
           coverage combine # Combine all .coverage files
           coverage report --format=markdown >> $GITHUB_STEP_SUMMARY # Output to GitHub summary
           coverage html --skip-covered --skip-empty --fail-under 90 # Generate HTML report for detailed view
