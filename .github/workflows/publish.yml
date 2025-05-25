@@ -66,6 +66,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: python-package-distributions
+          path: dist/
       - name: Upload distribution 📦 to GitHub
         run: gh release upload $TAG $FILE --clobber
         env:
