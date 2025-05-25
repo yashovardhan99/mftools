@@ -84,7 +84,7 @@ def apply_filters(
     All filters are combined using OR. The keys of the dictionary are
     the column names and the values are lists of values to filter by.
 
-    Example:
+    Examples:
     >>>     filters = {
     ...         "symbol": ["0500209", "500210"],
     ...         "name": ["UTI Nifty Next 50 Index Fund - Direct"]

@@ -1,7 +1,7 @@
 """Type aliases for NiveshPy models.
 
 This module is designed to work with static type checkers and as such
-imports optional depedencies like pandas. Avoid importing this module
+imports optional dependencies like pandas. Avoid importing this module
 directly, instead import this module inside a `if TYPE_CHECKING` block.
 """
 
