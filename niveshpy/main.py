@@ -623,7 +623,7 @@ class Nivesh:
         Raises:
             ValueError: If the end date is before the start date.
 
-        Example:
+        Examples:
             >>> nivesh = Nivesh()
             >>> quotes = nivesh.get_quotes("500209", "500210", ("500211", "amfi"))
         """

@@ -1,0 +1,75 @@
+site_name: NiveshPy
+site_url: https://https://yashovardhan99.github.io/niveshpy/
+repo_url: https://github.com/yashovardhan99/niveshpy
+repo_name: yashovardhan99/niveshpy
+theme:
+  name: material
+
+  features:
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+
+  palette:
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - .
+            - niveshpy/plugins
+          options:
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            merge_init_into_class: true
+      default_handler: python
+  - macros
+
+markdown_extensions:
+  - pymdownx.snippets
+  - pymdownx.highlight:
+  - pymdownx.superfences
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - toc:
+      permalink: true
+nav:
+  - Home: index.md
+
+  - Getting Started:
+      - guide/index.md
+
+  - Plugins:
+      - plugins/index.md
+      - AMFI: plugins/amfi.md
+
+  - API Reference:
+      - NiveshPy: reference/niveshpy.md
+      - Models: reference/models.md
+      - Plugins:
+          - reference/plugins/index.md
+          - AMFI: reference/plugins/amfi.md
+
+  - Changelog: changelog.md

@@ -48,10 +48,16 @@ releasenotes = "https://github.com/yashovardhan99/niveshpy/releases"
 testing = ["pytest >= 8.3.5, < 9.0.0", "coverage[toml] >= 7.8.0, < 8.0.0"]
 linting = ["ruff >= 0.11.9, < 0.12.0", "mypy >= 1.15.0, < 2.0.0"]
 stubs = ["pandas-stubs >= 2.2.2, < 3.0.0"]
+docs = [
+    "mkdocs-material == 9.*",
+    "mkdocstrings[python]",
+    "mkdocs-macros-plugin == 1.*",
+]
 dev = [
     { include-group = "testing" },
     { include-group = "linting" },
     { include-group = "stubs" },
+    { include-group = "docs" },
 ]
 
 [tool.ruff.lint]

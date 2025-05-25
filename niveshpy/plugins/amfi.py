@@ -35,7 +35,7 @@ class AMFIPlugin(Plugin):
     def get_sources(self):
         """Return a list of sources for the plugin."""
         # Here you would return a list of sources that the plugin provides.
-        # For example:
+        # For Examples:
         return self.sources
 
 
