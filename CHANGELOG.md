@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New Github workflow for automated testing and coverage.
+- New classifiers to properly describe the project
+
+### Fixed
+
+- Problem with publishing assets to Github Releases
+- Documentation URL fixes
+
 
 ## [0.1.0.dev0]
 
