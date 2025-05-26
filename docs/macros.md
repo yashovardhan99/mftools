@@ -5,7 +5,7 @@
         {% if nav1.title == page_title %}
             {% for child in nav1.children %}
                 {% if child.title != page_title %}
-- [{{ child.title }}]( {{ child.abs_url }} )
+- [{{ child.title }}]( {{ child.canonical_url }} )
                 {% endif %}
             {% endfor %}
         {% endif %}
@@ -20,7 +20,7 @@
                     {% for child in nav2.children %}
                         {% if child.title != page_title %}
 
-- [{{ child.title }}]( {{ child.abs_url }} )
+- [{{ child.title }}]( {{ child.canonical_url }} )
 
                         {% endif %}
                     {% endfor %}

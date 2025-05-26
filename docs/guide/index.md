@@ -36,9 +36,11 @@ app.get_quotes(...)
 ```
 
 Currently, the following functions are supported:
-`app.get_quotes()` to get the current/historical prices of your instruments.
-`app.get_tickers()` to get a list of all available tickers.
-`app.get_sources()` to check all configured sources.
+
+- [`app.get_quotes()`][niveshpy.Nivesh.get_quotes] to get the current/historical prices of your instruments.
+- [`app.get_tickers()`][niveshpy.Nivesh.get_tickers] to get a list of all available tickers.
+- [`app.get_sources()`][niveshpy.Nivesh.get_sources] to check all configured sources.
+
 
 ## Plugins
 NiveshPy ships with some pre-built plugins to make your life easier.
