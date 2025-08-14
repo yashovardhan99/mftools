@@ -61,6 +61,8 @@ jobs:
     needs:
       - build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # required to upload release assets
     steps:
       - name: Download all the dists
         uses: actions/download-artifact@v4
@@ -68,7 +70,7 @@ jobs:
           name: python-package-distributions
           path: dist/
       - name: Upload distribution 📦 to GitHub
-        run: gh release upload $TAG $FILE --clobber
+        run: gh release upload $TAG $FILE --clobber --repo yashovardhan99/niveshpy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
